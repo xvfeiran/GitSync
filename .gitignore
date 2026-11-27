@@ -1,0 +1,22 @@
+# build outputs
+bin/
+obj/
+publish/
+dist/
+*.user
+.vs/
+
+# local scratch / logs from builds and self-tests
+selftest-crash/
+*_out.txt
+*_err.txt
+st*.txt
+!**/README.txt
+
+# duplicate of design/ folder
+VendorSync-design.zip
+.superpowers/
+
+# internal design drafts / specs, not part of the open-source release
+design/
+docs/

@@ -1,0 +1,28 @@
+<Window x:Class="VendorSync.UI.DetailWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="分支详情" Width="720" SizeToContent="Height" MaxHeight="640"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="False"
+        Background="{StaticResource WindowBgBrush}"
+        FontFamily="Microsoft YaHei UI" FontSize="13">
+    <StackPanel Margin="20,16">
+        <TextBlock x:Name="HeaderText" FontWeight="SemiBold" FontSize="14"/>
+        <TextBlock x:Name="MetaText" Foreground="{StaticResource SubTextBrush}" Margin="0,6,0,0"/>
+
+        <TextBlock x:Name="TargetOnlyHeader" Text="" FontWeight="SemiBold" Margin="0,16,0,4"/>
+        <TextBox x:Name="TargetOnlyBox" IsReadOnly="True" FontFamily="Consolas" FontSize="12"
+                 Height="150" TextWrapping="NoWrap" VerticalScrollBarVisibility="Auto"
+                 HorizontalScrollBarVisibility="Auto" BorderBrush="{StaticResource InputBorderBrush}"
+                 Visibility="Collapsed"/>
+
+        <TextBlock x:Name="SourceOnlyHeader" Text="" FontWeight="SemiBold" Margin="0,12,0,4"/>
+        <TextBox x:Name="SourceOnlyBox" IsReadOnly="True" FontFamily="Consolas" FontSize="12"
+                 Height="150" TextWrapping="NoWrap" VerticalScrollBarVisibility="Auto"
+                 HorizontalScrollBarVisibility="Auto" BorderBrush="{StaticResource InputBorderBrush}"
+                 Visibility="Collapsed"/>
+
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">
+            <Button Content="关闭" Width="90" Height="32" IsDefault="True" IsCancel="True" Style="{StaticResource BaseButton}"/>
+        </StackPanel>
+    </StackPanel>
+</Window>

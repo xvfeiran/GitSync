@@ -1,0 +1,55 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <AssemblyName>GitSync</AssemblyName>
+    <RootNamespace>VendorSync</RootNamespace>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>app.ico</ApplicationIcon>
+    <Version>1.1.0</Version>
+    <Product>GitSync · Git 仓库同步工具</Product>
+    <Company>GitSync contributors</Company>
+    <Authors>GitSync contributors</Authors>
+    <Description>把源仓库的全部分支和标签同步到目标仓库</Description>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)'=='Release'">
+    <DebugType>none</DebugType>
+    <PublishSingleFile>true</PublishSingleFile>
+    <SelfContained>true</SelfContained>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <!-- 公司安全策略拦截未签名 exe 向 %TEMP% 写文件（单文件自解包会失败），
+         因此禁止自解包与压缩，原生库直接从 bundle 内存加载。 -->
+    <IncludeNativeLibrariesForSelfExtract>false</IncludeNativeLibrariesForSelfExtract>
+    <EnableCompressionInSingleFile>false</EnableCompressionInSingleFile>
+    <PublishTrimmed>false</PublishTrimmed>
+    <SatelliteResourceLanguages>en;zh-Hans</SatelliteResourceLanguages>
+  </PropertyGroup>
+
+  <!-- App.xaml 在 UI\ 子目录里，需要显式指定为应用程序定义 -->
+  <PropertyGroup>
+    <!-- 自己写 Main：命令行模式（selftest / inspect）不进 WPF Application -->
+    <DefineConstants>DISABLE_XAML_GENERATED_MAIN</DefineConstants>
+    <StartupObject>VendorSync.Program</StartupObject>
+  </PropertyGroup>
+  <ItemGroup>
+    <ApplicationDefinition Include="UI\App.xaml" />
+    <Page Remove="UI\App.xaml" />
+  </ItemGroup>
+
+  <!-- WPF 下默认隐式 using 集合不含这些命名空间，统一补上 -->
+  <ItemGroup>
+    <Using Include="System.IO" />
+    <Using Include="System.Collections.Generic" />
+    <Using Include="System.Linq" />
+    <Using Include="System.Threading" />
+    <Using Include="System.Threading.Tasks" />
+    <Using Include="VendorSync.Core" />
+  </ItemGroup>
+
+</Project>
