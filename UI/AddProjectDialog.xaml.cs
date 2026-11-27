@@ -23,7 +23,7 @@ public partial class AddProjectDialog : Window
 
     private void BtnBrowse_Click(object sender, RoutedEventArgs e)
     {
-        var dialog = new OpenFolderDialog { Title = "选择本地克隆的仓库目录" };
+        var dialog = new OpenFolderDialog { Title = Loc.T("Add.FolderDialogTitle") };
         if (Directory.Exists(PathBox.Text)) dialog.InitialDirectory = PathBox.Text;
         if (dialog.ShowDialog(this) == true)
         {
@@ -63,12 +63,12 @@ public partial class AddProjectDialog : Window
         var path = PathBox.Text.Trim();
         if (path.Length == 0)
         {
-            Prompt.Warn(this, "请选择本地仓库目录，或点「克隆新仓库」。", "缺少目录");
+            Prompt.Warn(this, Loc.T("Add.WarnNoPath"), Loc.T("Caption.MissingDir"));
             return;
         }
         if (_git is null || !_git.IsRepository(path))
         {
-            Prompt.Warn(this, "这个目录还不是 git 仓库。请选仓库根目录，或用「克隆新仓库」。", "不是仓库");
+            Prompt.Warn(this, Loc.T("Add.WarnNotRepo"), Loc.T("Caption.NotARepo"));
             return;
         }
 
@@ -76,7 +76,7 @@ public partial class AddProjectDialog : Window
         var internalRemote = InternalBox.Text.Trim();
         if (vendor.Length == 0 || internalRemote.Length == 0)
         {
-            Prompt.Warn(this, "源仓库远程和目标仓库远程都要填（一般分别是 origin 和 bitbucket）。", "缺少远程名");
+            Prompt.Warn(this, Loc.T("Add.WarnNoRemotes"), Loc.T("Caption.MissingRemote"));
             return;
         }
 

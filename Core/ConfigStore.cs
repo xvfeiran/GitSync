@@ -57,6 +57,9 @@ public sealed class AppConfig
     public bool IncludeTags { get; set; } = true;
     public bool ConfirmBeforePush { get; set; } = true;
 
+    /// <summary>界面语言："zh" / "en"；null 表示自动跟随 Windows 系统。</summary>
+    public string? Language { get; set; }
+
     /// <summary>最近用过的仓库（含各自的远程配置），启动时填进下拉框。</summary>
     public List<RepoProfile> RecentRepos { get; set; } = new();
 
@@ -155,6 +158,7 @@ public sealed class AppConfig
         Strategy = Strategy,
         IncludeTags = IncludeTags,
         ConfirmBeforePush = ConfirmBeforePush,
+        Language = Language,
         SshIdentityFile = SshIdentityFile,
         RecentRepos = RecentRepos.Select(p => p.Copy()).ToList()
     };

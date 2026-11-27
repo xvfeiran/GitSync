@@ -22,15 +22,20 @@ public partial class MainWindow : Window
 
     public MainWindow()
     {
+        // 先读配置并确定语言，再初始化界面：XAML 里的 loc 绑定取到的就是最终语言。
+        _store = new ConfigStore();
+        _config = _store.Load();
+        _config.EnsureLists();
+        Loc.LanguagePersist = lang => { _config.Language = lang; Persist(); };
+        if (!string.IsNullOrWhiteSpace(_config.Language)) Loc.SetLanguage(_config.Language);
+        Loc.LanguageChanged += OnLanguageChanged;
+
         InitializeComponent();
         Icon = AppIcon.Load();
 
         // 软件渲染（老电脑 / 远程桌面）：关闭阴影，进简洁模式。
         Neu.ReducedEffects = RenderCapability.Tier >> 16 == 0;
 
-        _store = new ConfigStore();
-        _config = _store.Load();
-        _config.EnsureLists();
         CardList.ItemsSource = _projects;
 
         AppLog.Attach(AppendLog);
@@ -38,24 +43,38 @@ public partial class MainWindow : Window
         Loaded += (_, _) => Startup();
     }
 
+    /// <summary>语言切换后：重设 XAML 之外的动态文本（状态栏、日志行、摘要等）。</summary>
+    private void OnLanguageChanged()
+    {
+        RunOnUi(() =>
+        {
+            LogOneLine.Text = Loc.T("Log.Title");
+            BtnLogToggle.Content = Loc.T(_logExpanded ? "Log.Collapse" : "Log.Expand");
+            RefreshHome();
+            if (_current is not null) RenderDetail();
+            if (_projects.Count == 0) SetStatus(Loc.T("Status.Ready"));
+        });
+    }
+
+    private void BtnLang_Click(object sender, RoutedEventArgs e)
+        => Loc.SetLanguage(Loc.Language == "zh" ? "en" : "zh");
+
     // ------------------------------------------------------------- 启动
 
     private void Startup()
     {
-        AppendLog("=== 同步项目 ===");
+        AppendLog(Loc.T("Startup.LogTitle"));
         SetAppInfo();
         _git = GitClient.Locate();
         if (_git is null)
         {
-            AppendLog("✖ 没有找到 git.exe。");
+            AppendLog(Loc.T("Msg.NoGit"));
             const string gitUrl = "https://git-scm.com/download/win";
-            AppendLog("安装地址：" + gitUrl);
-            SetStatus("缺少 git");
+            AppendLog(Loc.F("Msg.GitInstallUrl", gitUrl));
+            SetStatus(Loc.T("Status.NoGit"));
             var open = Prompt.Confirm(this,
-                "没有找到 git.exe，本工具无法工作。\r\n\r\n" +
-                "请到 Git 官网下载安装「Git for Windows」：\r\n" + gitUrl +
-                "\r\n\r\n安装后关闭所有终端和编辑器，再重新打开本工具。\r\n\r\n现在打开下载页面？",
-                "缺少 Git", defaultWhenSilent: false);
+                Loc.F("Confirm.NoGitText", gitUrl),
+                Loc.T("Caption.NoGit"), defaultWhenSilent: false);
             if (open) OpenGitInstallPage();
             return;
         }
@@ -64,7 +83,7 @@ public partial class MainWindow : Window
 
         foreach (var p in _config.Projects) _projects.Add(new ProjectVm(p));
         RefreshHome();
-        SetStatus(_projects.Count == 0 ? "就绪。" : $"就绪，正在后台检查 {_projects.Count} 个项目…");
+        SetStatus(_projects.Count == 0 ? Loc.T("Status.Ready") : Loc.F("Status.ReadyChecking", _projects.Count));
 
         // 后台自动检查：项目之间并行跑，谁先完成谁先亮灯。
         if (_projects.Count > 0)
@@ -78,9 +97,9 @@ public partial class MainWindow : Window
                 }
                 catch (Exception ex)
                 {
-                    AppLog.Write("后台自动检查出错：" + ex);
+                    AppLog.Write(Loc.F("Log.AutoCheckError", ex));
                 }
-                SetStatus("就绪，后台检查完成。");
+                SetStatus(Loc.T("Status.AutoCheckDone"));
             });
         }
     }
@@ -95,7 +114,7 @@ public partial class MainWindow : Window
                 UseShellExecute = true
             });
         }
-        catch (Exception ex) { AppendLog("打开安装页面失败：" + ex.Message); }
+        catch (Exception ex) { AppendLog(Loc.F("Log.OpenUrlFail", ex.Message)); }
     }
 
     /// <summary>右下角应用信息：名称 + 版本。</summary>
@@ -114,21 +133,21 @@ public partial class MainWindow : Window
             var diagnosis = CredentialHelperResolver.Diagnose(_git);
             if (!diagnosis.NeedsRepair)
             {
-                AppendLog("凭据辅助程序：正常（由本机 git 管理）。");
+                AppendLog(Loc.T("Log.DiagOk"));
                 return;
             }
-            AppendLog("⚠ 本机 git 凭据辅助程序配置有问题：" + diagnosis.Summary);
+            AppendLog(Loc.F("Log.DiagProblem", diagnosis.Summary));
             if (diagnosis.ReplacementPath is null)
             {
-                AppendLog("✖ 没找到可用的替代程序，HTTPS 凭据将无法保存。请重装 Git for Windows。");
+                AppendLog(Loc.T("Log.DiagNoReplacement"));
                 return;
             }
             _git.CredentialOverride = CredentialHelperResolver.BuildOverrideArgs(diagnosis);
-            AppendLog($"✔ 已自动修正（只影响本程序）：{diagnosis.ReplacementPath}");
+            AppendLog(Loc.F("Log.DiagFixed", diagnosis.ReplacementPath));
         }
         catch (Exception ex)
         {
-            AppendLog("诊断凭据环境时出错：" + ex.Message);
+            AppendLog(Loc.F("Log.DiagError", ex.Message));
         }
     }
 
@@ -140,9 +159,9 @@ public partial class MainWindow : Window
         var pending = _projects.Count(p => p.Orb is OrbState.Pending);
         var failed = _projects.Count(p => p.Orb is OrbState.Failed);
         HomeSummary.Text = _projects.Count == 0 ? "" :
-            failed > 0 ? $"{_projects.Count} 个项目，{failed} 个失败，需要处理。"
-            : pending > 0 ? $"{_projects.Count} 个项目，{pending} 个有待同步。"
-            : $"{_projects.Count} 个项目，全部已一致。";
+            failed > 0 ? Loc.F("Home.SummaryFail", _projects.Count, failed)
+            : pending > 0 ? Loc.F("Home.SummaryPending", _projects.Count, pending)
+            : Loc.F("Home.SummaryOk", _projects.Count);
     }
 
     private void Card_Click(object sender, RoutedEventArgs e)
@@ -172,7 +191,7 @@ public partial class MainWindow : Window
         if (_git is null || vm.Busy) return;
         if (!Directory.Exists(vm.Model.Path))
         {
-            Prompt.Warn(this, "本地仓库目录不存在，无法设置远程。", "目录缺失");
+            Prompt.Warn(this, Loc.T("Warn.DirMissing"), Loc.T("Caption.DirMissing"));
             return;
         }
         var dialog = new RemoteSettingsDialog(
@@ -190,14 +209,14 @@ public partial class MainWindow : Window
             DetailSource.Text = _git.GetRemoteUrl(vm.Model.Path, vm.Model.VendorRemote) ?? vm.Model.VendorRemote;
             DetailTarget.Text = vm.Model.InternalRemote + " · " + (_git.GetRemoteUrl(vm.Model.Path, vm.Model.InternalRemote) ?? "—");
         }
-        SetStatus($"已更新「{vm.Model.DisplayName}」的远程仓库。");
+        SetStatus(Loc.F("Status.RemotesUpdated", vm.Model.DisplayName));
         RunInspect(vm);
     }
 
     private void MenuRemove_Click(object sender, RoutedEventArgs e)
     {
         if ((sender as FrameworkElement)?.DataContext is not ProjectVm vm) return;
-        if (!Prompt.Confirm(this, $"移除项目「{vm.Model.DisplayName}」？\r\n\r\n只从本工具的列表里移除，不删除仓库文件。", "移除项目")) return;
+        if (!Prompt.Confirm(this, Loc.F("Confirm.RemoveText", vm.Model.DisplayName), Loc.T("Caption.RemoveProject"))) return;
         _config.RemoveProject(vm.Model);
         Persist();
         _projects.Remove(vm);
@@ -210,7 +229,7 @@ public partial class MainWindow : Window
         var project = _current?.Model ?? _config.Projects.FirstOrDefault();
         if (project is null)
         {
-            Prompt.Info(this, "先添加一个同步项目，再配置凭据。", "提示");
+            Prompt.Info(this, Loc.T("Info.AddFirst"), Loc.T("Caption.Info"));
             return;
         }
         _config.SetCurrent(project);
@@ -239,7 +258,7 @@ public partial class MainWindow : Window
                 _projects.Add(vm);
             }
             RefreshHome();
-            SetStatus($"已添加项目：{existing.DisplayName}");
+            SetStatus(Loc.F("Status.Added", existing.DisplayName));
 
             // 立即检查一次，让新卡片有状态（RunInspect 自行处理线程切换）。
             RunInspect(vm);
@@ -314,14 +333,16 @@ public partial class MainWindow : Window
             DetailTags.IsChecked = _config.IncludeTagsFor(vm.Model);
             var snap = vm.Snapshot;
             BranchSummary.Text = snap is null ? "" :
-                $"{snap.Statuses.Count} 个分支，{snap.PendingBranches} 个需要处理" +
-                (snap.NewTagCount > 0 ? $"，{snap.NewTagCount} 个新标签" : "");
+                Loc.F("Branch.Summary", snap.Statuses.Count, snap.PendingBranches) +
+                (snap.NewTagCount > 0 ? Loc.F("Branch.SummaryTags", snap.NewTagCount) : "");
             // 目标仓库独有的分支：一律保留不动，这里明说，免得用户担心被删。
             var extra = snap?.InternalOnlyBranches ?? Array.Empty<string>();
             DetailSummary.Text = snap is null ? "" :
-                $"源仓库 {snap.Statuses.Count} 个分支，{snap.PendingBranches} 个需要同步。" +
+                Loc.F("Summary.SourceBranches", snap.Statuses.Count, snap.PendingBranches) +
                 (extra.Count == 0 ? "" :
-                    $"  目标仓库多 {extra.Count} 个分支（{string.Join("、", extra.Take(4))}{(extra.Count > 4 ? " 等" : "")}），保留不动，不会被删除或覆盖。");
+                    Loc.F("Summary.TargetOnly", extra.Count,
+                        string.Join("、", extra.Take(4)),
+                        extra.Count > 4 ? Loc.T("Summary.ExtraSuffix") : ""));
             BranchList.ItemsSource = BuildBranchRows(snap, (BranchToggle.IsChecked == true));
             SetStep(StepConn, vm.Stage >= SyncStage.Connect && vm.Stage != SyncStage.Connect ? "done" : vm.Stage == SyncStage.Connect ? "running" : "pending");
             SetStep(StepCheck, vm.Stage >= SyncStage.Check ? "done" : vm.Stage == SyncStage.Check ? "running" : "pending");
@@ -329,7 +350,7 @@ public partial class MainWindow : Window
             SetStep(StepVerify, vm.Stage >= SyncStage.Verify ? "done" : vm.Stage == SyncStage.Verify ? "running" : "pending");
             DetailRing.Progress = vm.Fraction;
             DetailPercent.Text = vm.Fraction > 0 && vm.Fraction < 1 ? $"{(int)(vm.Fraction * 100)}%" : "";
-            DetailKnobText.Text = vm.Busy ? "同步中…" : "同步";
+            DetailKnobText.Text = Loc.T(vm.Busy ? "Detail.Syncing" : "Detail.Sync");
             BtnDetailSync.IsEnabled = !vm.Busy;
             BtnDetailCheck.IsEnabled = !vm.Busy;
         }
@@ -352,22 +373,22 @@ public partial class MainWindow : Window
                 StateLabel = s.StateLabel,
                 Delta = s.State switch
                 {
-                    BranchState.Behind => $"源多 {s.VendorOnly} 个提交",
-                    BranchState.InternalAhead => $"目标多 {s.InternalOnly} 个提交",
-                    BranchState.Diverged => $"源 +{s.VendorOnly} / 目标 +{s.InternalOnly}",
-                    BranchState.New => "新分支",
+                    BranchState.Behind => Loc.F("Delta.Behind", s.VendorOnly),
+                    BranchState.InternalAhead => Loc.F("Delta.InternalAhead", s.InternalOnly),
+                    BranchState.Diverged => Loc.F("Delta.Diverged", s.VendorOnly, s.InternalOnly),
+                    BranchState.New => Loc.T("Delta.New"),
                     _ => "—"
                 },
                 Plan = s.State switch
                 {
-                    BranchState.Behind => "直接推送（快进）",
-                    BranchState.New => "在目标仓库新建",
-                    BranchState.Diverged => snap.Strategy == SyncStrategy.Force ? "以源为准覆盖 · 先备份" : "合并后推送",
-                    BranchState.InternalAhead => snap.Strategy == SyncStrategy.Force ? "以源为准覆盖 · 先备份" : "保留",
-                    BranchState.VendorGone => "保留，不删除",
-                    _ => "已一致"
+                    BranchState.Behind => Loc.T("Plan.Behind"),
+                    BranchState.New => Loc.T("Plan.New"),
+                    BranchState.Diverged => Loc.T(snap.Strategy == SyncStrategy.Force ? "Plan.Overwrite" : "Plan.Merge"),
+                    BranchState.InternalAhead => Loc.T(snap.Strategy == SyncStrategy.Force ? "Plan.Overwrite" : "Plan.Keep"),
+                    BranchState.VendorGone => Loc.T("Plan.VendorGone"),
+                    _ => Loc.T("Plan.UpToDate")
                 },
-                Result = needs ? "待处理" : s.State == BranchState.UpToDate ? "一致" : ""
+                Result = needs ? Loc.T("Result.Pending") : s.State == BranchState.UpToDate ? Loc.T("Result.UpToDate") : ""
             });
         }
         // 目标仓库独有的分支：一并列出，明确标注保留不动。
@@ -377,9 +398,9 @@ public partial class MainWindow : Window
             {
                 Name = b,
                 State = BranchState.VendorGone,
-                StateLabel = "目标独有",
+                StateLabel = Loc.T("StateLabel.InternalOnly"),
                 Delta = "—",
-                Plan = "保留，不同步不删除",
+                Plan = Loc.T("Plan.InternalOnly"),
                 Result = ""
             });
         }
@@ -401,19 +422,19 @@ public partial class MainWindow : Window
     {
         if (_git is null || !Directory.Exists(vm.Model.Path)) return true;
         var manager = new HttpsCredentialManager(_git, AppendLog);
-        foreach (var (label, remote) in new[] { ("源仓库", vm.Model.VendorRemote), ("目标仓库", vm.Model.InternalRemote) })
+        foreach (var (label, remote) in new[] { (Loc.T("Label.SourceRepo"), vm.Model.VendorRemote), (Loc.T("Label.TargetRepo"), vm.Model.InternalRemote) })
         {
             var url = _git.GetRemoteUrl(vm.Model.Path, remote);
             if (url is null || RemoteUrl.Detect(url) != RemoteScheme.Https) continue;
             var status = manager.Probe(url);
             if (status.Ok) continue;
 
-            AppendLog($"{label}（{remote}）需要登录：{status.Summary}");
+            AppendLog(Loc.F("Log.CredNeeded", label, remote, status.Summary));
             var dialog = new CredentialPromptDialog(this, _git, AppendLog, $"{label} · {remote}", url);
             if (dialog.ShowDialog() != true)
             {
-                AppendLog("未提供凭据，操作取消。");
-                SetStatus("缺少凭据，操作已取消。");
+                AppendLog(Loc.T("Log.NoCredentials"));
+                SetStatus(Loc.T("Status.NoCredentials"));
                 return false;
             }
         }
@@ -437,7 +458,7 @@ public partial class MainWindow : Window
             vm.Busy = true;
             vm.Orb = OrbState.Running;
             vm.Stage = SyncStage.Connect;
-            vm.Message = "正在检查…";
+            vm.Message = Loc.T("Status.Checking");
             vm.Refresh();
         });
         var options = OptionsFor(vm);
@@ -471,7 +492,7 @@ public partial class MainWindow : Window
                     {
                         vm.Snapshot = snap;
                         vm.Stage = SyncStage.Done;
-                        vm.Message = snap.UpToDate ? "全部已一致，无需同步。" : $"{snap.PendingBranches} 个分支需要同步";
+                        vm.Message = snap.UpToDate ? Loc.T("Card.MsgUpToDate") : Loc.F("Card.MsgPending", snap.PendingBranches);
                         vm.Model.LastHealth = snap.UpToDate ? ProjectHealth.UpToDate : ProjectHealth.Pending;
                         vm.Model.PendingCount = snap.PendingCount;
                         vm.Model.LastMessage = vm.Message;
@@ -487,12 +508,12 @@ public partial class MainWindow : Window
             catch (Exception ex)
             {
                 // 后台线程的未处理异常会直接拉崩整个进程，这里兜住并转成卡片状态。
-                AppLog.Write("检查出错：" + ex);
+                AppLog.Write(Loc.F("Log.InspectError", ex));
                 Dispatch(() =>
                 {
                     vm.Busy = false;
                     vm.Orb = OrbState.Failed;
-                    vm.Message = "检查出错：" + ex.Message;
+                    vm.Message = Loc.F("Msg.InspectErrorPrefix", ex.Message);
                     vm.Model.LastHealth = ProjectHealth.Failed;
                     vm.Model.LastMessage = vm.Message;
                     vm.Model.LastCheckedAt = DateTime.Now;
@@ -531,17 +552,17 @@ public partial class MainWindow : Window
                 var detail = new System.Text.StringBuilder();
                 foreach (var s in risky)
                 {
-                    detail.AppendLine($"【{s.Name}】目标仓库独有 {s.InternalOnly} 个 / 源仓库独有 {s.VendorOnly} 个提交");
-                    foreach (var c in s.InternalOnlyCommits.Take(3)) detail.AppendLine("    目标: " + c);
+                    detail.AppendLine(Loc.F("Sync.ConfirmBranch", s.Name, s.InternalOnly, s.VendorOnly));
+                    foreach (var c in s.InternalOnlyCommits.Take(3)) detail.AppendLine(Loc.T("Sync.ConfirmTargetLine") + c);
                 }
                 detail.AppendLine();
                 detail.AppendLine(options.Strategy == SyncStrategy.Force
-                    ? "将以源仓库为准覆盖这些分支；被覆盖的提交会先备份成 vendor-backup 标签，随时可以找回。"
-                    : "将生成合并提交，双方提交都保留。");
-                detail.Append("\r\n继续？");
+                    ? Loc.T("Sync.ConfirmForce")
+                    : Loc.T("Sync.ConfirmMerge"));
+                detail.Append(Loc.T("Sync.ConfirmContinue"));
 
                 var answer = false;
-                Invoke(() => { answer = Prompt.Confirm(this, detail.ToString(), "确认同步"); });
+                Invoke(() => { answer = Prompt.Confirm(this, detail.ToString(), Loc.T("Caption.ConfirmSync")); });
                 return answer;
             }, progress);
 
@@ -559,7 +580,7 @@ public partial class MainWindow : Window
                 else if (result.Cancelled)
                 {
                     vm.Orb = OrbState.Pending;
-                    vm.Message = "已取消。";
+                    vm.Message = Loc.T("Card.Cancelled");
                 }
                 else
                 {
@@ -570,14 +591,16 @@ public partial class MainWindow : Window
                     if (result.Succeeded)
                     {
                         vm.Orb = OrbState.UpToDate;
-                        vm.Message = $"同步完成：推送 {result.Pushed} 项" + (result.TagsPushed > 0 ? $"，新增 {result.TagsPushed} 个标签" : "") + "。";
+                        vm.Message = Loc.F("Sync.DonePushed", result.Pushed)
+                            + (result.TagsPushed > 0 ? Loc.F("Sync.DoneTags", result.TagsPushed) : "")
+                            + Loc.T("Sync.DoneSuffix");
                         vm.Model.LastHealth = ProjectHealth.UpToDate;
                         vm.Model.PendingCount = 0;
                     }
                     else
                     {
                         vm.Orb = OrbState.Failed;
-                        vm.Message = $"完成，但有 {result.Failed} 项失败，见日志。";
+                        vm.Message = Loc.F("Sync.PartialFail", result.Failed);
                         vm.Model.LastHealth = ProjectHealth.Failed;
                     }
                     vm.Model.LastMessage = vm.Message;
@@ -587,17 +610,17 @@ public partial class MainWindow : Window
                 if (_current == vm) RenderDetail();
                 RefreshHome();
                 if (result.Error is not null)
-                    Prompt.Warn(this, FirstLine(result.Error) + "\r\n\r\n详情见下方日志。", "检查失败");
+                    Prompt.Warn(this, FirstLine(result.Error) + Loc.T("Sync.WarnDetailSuffix"), Loc.T("Caption.SyncFailed"));
                 });
             }
             catch (Exception ex)
             {
-                AppLog.Write("同步出错：" + ex);
+                AppLog.Write(Loc.F("Log.SyncError", ex));
                 Dispatch(() =>
                 {
                     vm.Busy = false;
                     vm.Orb = OrbState.Failed;
-                    vm.Message = "同步出错：" + ex.Message;
+                    vm.Message = Loc.F("Msg.SyncErrorPrefix", ex.Message);
                     vm.Model.LastHealth = ProjectHealth.Failed;
                     vm.Model.LastMessage = vm.Message;
                     vm.Refresh();
@@ -614,7 +637,7 @@ public partial class MainWindow : Window
 
     private void Persist()
     {
-        if (!_store.Save(_config, out var error)) AppendLog("配置保存失败：" + error);
+        if (!_store.Save(_config, out var error)) AppendLog(Loc.F("Log.ConfigSaveFail", error));
     }
 
     // ------------------------------------------------------------- 日志抽屉
@@ -641,14 +664,14 @@ public partial class MainWindow : Window
     {
         _logExpanded = !_logExpanded;
         LogBox.Visibility = _logExpanded ? Visibility.Visible : Visibility.Collapsed;
-        BtnLogToggle.Content = _logExpanded ? "收起 ▼" : "展开 ▲";
+        BtnLogToggle.Content = Loc.T(_logExpanded ? "Log.Collapse" : "Log.Expand");
         if (_logExpanded) LogBox.ScrollToEnd();
     }
 
     private void BtnCopyLog_Click(object sender, RoutedEventArgs e)
     {
         if (string.IsNullOrWhiteSpace(LogBox.Text)) return;
-        try { Clipboard.SetText(LogBox.Text); SetStatus("日志已复制到剪贴板"); }
+        try { Clipboard.SetText(LogBox.Text); SetStatus(Loc.T("Status.LogCopied")); }
         catch (ExternalException) { }
     }
 
@@ -656,22 +679,22 @@ public partial class MainWindow : Window
     {
         var vm = _current;
         var text = new System.Text.StringBuilder()
-            .AppendLine("=== GitSync 诊断信息 ===")
-            .AppendLine("时间：" + DateTime.Now)
-            .AppendLine("项目：" + (vm?.Model.DisplayName ?? "—"))
-            .AppendLine("仓库：" + (vm?.Model.Path ?? "—"))
-            .AppendLine("源：" + (vm?.Model.VendorRemote ?? "—") + "    目标：" + (vm?.Model.InternalRemote ?? "—"))
-            .AppendLine("git：" + EnvText.Text)
+            .AppendLine(Loc.T("Diag.Title"))
+            .AppendLine(Loc.F("Diag.Time", DateTime.Now))
+            .AppendLine(Loc.F("Diag.Project", vm?.Model.DisplayName ?? "—"))
+            .AppendLine(Loc.F("Diag.Repo", vm?.Model.Path ?? "—"))
+            .AppendLine(Loc.F("Diag.Remotes", vm?.Model.VendorRemote ?? "—", vm?.Model.InternalRemote ?? "—"))
+            .AppendLine(Loc.F("Diag.Git", EnvText.Text))
             .AppendLine()
             .Append(LogBox.Text);
-        try { Clipboard.SetText(text.ToString()); SetStatus("诊断信息已复制，直接发给维护人即可"); }
+        try { Clipboard.SetText(text.ToString()); SetStatus(Loc.T("Status.DiagCopied")); }
         catch (ExternalException) { }
     }
 
     private void BtnClearLog_Click(object sender, RoutedEventArgs e)
     {
         LogBox.Clear();
-        LogOneLine.Text = "日志";
+        LogOneLine.Text = Loc.T("Log.Title");
     }
 
     // ------------------------------------------------------------- 杂项
@@ -727,13 +750,14 @@ public class ProjectVm : INotifyPropertyChanged
 
     public string PendingText => Snapshot is null ? "" : Snapshot.PendingCount > 0 ? Snapshot.PendingCount.ToString() : "";
     public string RoutesText => $"{Model.VendorRemote} → {Model.InternalRemote}";
-    public string Message { get; set; } = "尚未检查";
+    public string Message { get; set; } = Loc.T("Card.NotChecked");
     public string LastRunText
     {
         get
         {
             var t = Model.LastSyncedAt ?? Model.LastCheckedAt;
-            return t is null ? "从未运行" : $"上次{(Model.LastSyncedAt is null ? "检查" : "同步")}：{t:MM-dd HH:mm}";
+            return t is null ? Loc.T("Card.NeverRun")
+                : Loc.F(Model.LastSyncedAt is null ? "Card.LastCheck" : "Card.LastSync", t);
         }
     }
 

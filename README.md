@@ -1,92 +1,110 @@
 # GitSync
 
-简体中文 | [English](README_EN.md)
+English | [简体中文](README.zh-CN.md)
 
-一个 Windows 桌面小工具：把**源仓库**（上游，别人维护的 Git 仓库）的全部分支和标签，
-一次性同步到**目标仓库**（你自己这边接收同步的仓库）。双击即用，不需要安装 .NET。
+A small Windows desktop tool that syncs **all branches and tags** from a **source
+repository** (the upstream, maintained by someone else) to a **target repository**
+(the one on your side that receives the sync). Double-click to run — no .NET
+installation required.
 
-适用于「上游仓库 → 自己的镜像/备份仓库」的定期同步场景，例如上游代码跟进、
-组织迁移、跨平台镜像等。术语与 Gitee / Gitea 的「仓库同步 / fork 同步」一致：
-源仓库（上游）→ 目标仓库（接收方）。
+Typical use cases: keeping a mirror/backup repository in sync with an upstream,
+following vendor code, org migrations, cross-platform mirroring. The terminology
+matches Gitee / Gitea's "repository sync / fork sync": source (upstream) →
+target (receiver).
 
-## 特性
+## Features
 
-- **多项目管理**：卡片墙展示每个项目的同步状态（一致 / 有待同步 / 失败），后台自动检查
-- **只读检查**：同步前先比对所有分支（快进 / 新分支 / 分叉 / 目标领先），绝不先斩后奏
-- **安全同步**：
-  - 目标仓库**独有的分支永远不会被删除或覆盖**
-  - 覆盖策略使用保护性 `--force-with-lease`，不会盲推
-  - 标签只新增、不覆盖目标仓库已有的同名标签
-  - 推送后独立核服务器真实状态，确认真正同步成功
-- **凭据零接触**：不录入、不保存任何账号密码。HTTPS 凭据走本机 Git Credential Manager，
-  SSH 私钥始终留在 `~/.ssh`。配置文件里只有路径和远程名，可以随便截图分享
-- **SSH 向导**：生成 ed25519 密钥 → 复制公钥 → 测试连接，四步走完
-- **可移植**：配置文件存放在 exe 同目录（不可写时退回 `%LOCALAPPDATA%`），拷走即带走
+- **Multi-project dashboard**: one card per project showing sync status
+  (up to date / pending / failed), with automatic background checks
+- **Read-only inspection**: compares every branch (fast-forward / new /
+  diverged / target-ahead) before anything is pushed
+- **Safe sync**:
+  - Branches that exist **only in the target repository are never deleted or
+    overwritten**
+  - Force strategy uses protective `--force-with-lease`, never a blind push
+  - Tags are only added; existing same-name tags on the target are never overwritten
+  - After pushing, the real server state is verified independently
+- **Zero credential handling**: no account or password is ever entered or stored.
+  HTTPS credentials go through the local Git Credential Manager; SSH private keys
+  stay in `~/.ssh`. The config file only contains paths and remote names
+- **SSH wizard**: generate an ed25519 key → copy public key → test connection,
+  four guided steps
+- **Bilingual UI**: English and Simplified Chinese, switchable in one click
+- **Portable**: the config file lives next to the exe (falls back to
+  `%LOCALAPPDATA%` when the directory is not writable) — copy it and you're done
 
-## 快速开始
+## Quick start
 
-### 前提
+### Prerequisites
 
 - Windows 10/11
-- 安装 [Git for Windows](https://git-scm.com/download/win)
-  （装完必须关掉所有窗口再重开本工具，否则找不到 git）
+- [Git for Windows](https://git-scm.com/download/win)
+  (close all windows and reopen this tool after installing, otherwise git
+  won't be found)
 
-### 使用
+### Usage
 
-1. 双击 `GitSync.exe`（建议放到固定目录，如 `D:\Tools\GitSync`）
-2. 点「＋ 添加项目」：
-   - 已有本地克隆：直接选仓库目录
-   - 还没有克隆：填源仓库地址，程序帮你克隆，并可顺便挂上目标仓库远程
-3. 确认两个远程（源仓库一般叫 `origin`，目标仓库自定；可在详情页「远程仓库…」里改名字和地址）
-4. 点「① 检查差异」——只读，看每个分支的状态
-5. 点「同步」——先再确认一次差异和风险分支，然后上传并独立校验
+1. Double-click `GitSync.exe` (put it in a fixed folder such as `D:\Tools\GitSync`)
+2. Click "Add project":
+   - Already have a local clone: just pick the repository folder
+   - No clone yet: enter the source repository URL, the tool clones it and can
+     attach the target remote at the same time
+3. Confirm the two remotes (source is usually `origin`; rename or re-point them
+   any time via "Remotes…" on the detail page)
+4. Click "Check" — read-only, shows the state of every branch
+5. Click "Sync" — reviews differences and risky branches once more, then pushes
+   and verifies independently
 
-### 分叉策略
+### Divergence strategy
 
-| 策略 | 行为 |
+| Strategy | Behavior |
 | --- | --- |
-| 以源仓库为准（默认） | 分叉的分支用源仓库覆盖目标仓库，覆盖前弹窗确认 |
-| 保留双方提交 | 生成合并提交，双方提交都保留；有冲突则安全放弃、目标仓库保持原样 |
+| Source wins (default) | Diverged branches are overwritten on the target with the source version, after a confirmation dialog |
+| Keep both | A merge commit is created, both sides are preserved; on conflict the merge is abandoned safely and the target stays untouched |
 
-目标仓库有、源仓库没有的分支：**任何策略下都保留不动**。
+Branches that exist on the target but not on the source are **kept untouched
+under every strategy**.
 
-## 命令行
+## Command line
 
 ```
-GitSync.exe --selftest    完整逻辑自测（临时仓库，不碰真实数据）
-GitSync.exe --inspect     只读查看当前项目的分支差异，绝不推送
-GitSync.exe --version     显示版本
+GitSync.exe --selftest    full logic self-test (temp repositories, no real data)
+GitSync.exe --inspect     read-only branch report for the current project, never pushes
+GitSync.exe --version     show version
 ```
 
-自测报告写到 `%TEMP%\GitSync\selftest-report.txt`。
+The self-test report is written to `%TEMP%\GitSync\selftest-report.txt`.
 
-## 从源码构建
+## Building from source
 
-需要 .NET 8 SDK（`net8.0-windows`，WPF）：
+Requires the .NET 8 SDK (`net8.0-windows`, WPF):
 
 ```
 dotnet build
 dotnet run -- --selftest
 ```
 
-发布单文件：`publish.bat`。
+Portable single-folder package: `publish.bat`.
 
-## 项目结构
+## Project layout
 
 ```
-Core/   引擎层，与界面无关：GitClient（git 封装）、SyncEngine（比对/执行/校验）、
-        ProjectRunner（编排）、ConfigStore（配置）、SshKeyManager、HttpsCredentialManager
-UI/     WPF 界面：主窗口（卡片墙 + 详情页 + 日志抽屉）、添加项目 / 克隆 / 远程设置 /
-        凭据与密钥等对话框
+Core/   engine layer, UI-free: GitClient (git wrapper), SyncEngine
+        (compare / execute / verify), ProjectRunner (orchestration),
+        ConfigStore, SshKeyManager, HttpsCredentialManager
+UI/     WPF UI: main window (card wall + detail page + log drawer),
+        add-project / clone / remote-settings / credentials dialogs
 ```
 
-## 安全说明
+## Security notes
 
-- 程序不保存、不录入任何账号、密码、令牌或私钥
-- HTTPS 凭据由 Git Credential Manager 写入 Windows 凭据管理器
-- SSH 私钥始终留在 `~/.ssh`，程序只读取公钥用于展示和复制
-- 配置文件 `vendorsync.config.json` 只记录路径与远程名
+- The program never stores or enters any account, password, token or private key
+- HTTPS credentials are written by Git Credential Manager into Windows
+  Credential Manager
+- SSH private keys always stay in `~/.ssh`; only the public key is read,
+  for display and copying
+- The config file `vendorsync.config.json` only records paths and remote names
 
-## 许可证
+## License
 
 [MIT](LICENSE)

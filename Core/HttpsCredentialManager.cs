@@ -73,8 +73,8 @@ public sealed class HttpsCredentialManager
             return new CredentialStatus
             {
                 Ok = false,
-                Summary = "不是 HTTPS 地址",
-                Detail = "这个远程用的是 SSH 或本地路径，不需要 HTTPS 账号。"
+                Summary = Loc.T("Cred.NotHttpsSummary"),
+                Detail = Loc.T("Cred.NotHttpsDetail")
             };
         }
 
@@ -101,8 +101,8 @@ public sealed class HttpsCredentialManager
             return new CredentialStatus
             {
                 Ok = false,
-                Summary = "还没有保存的凭据",
-                Detail = $"Git 凭据管理器里没有 {host} 的可用账号。点「保存凭据」填入你的账号和 PAT。"
+                Summary = Loc.T("Cred.NoSavedSummary"),
+                Detail = Loc.F("Cred.NoSavedDetail", host)
             };
         }
 
@@ -121,16 +121,16 @@ public sealed class HttpsCredentialManager
             return new CredentialStatus
             {
                 Ok = false,
-                Summary = "凭据不完整",
-                Detail = "找到了用户名但没有密码或令牌，请重新保存一次。"
+                Summary = Loc.T("Cred.IncompleteSummary"),
+                Detail = Loc.T("Cred.IncompleteDetail")
             };
         }
 
         return new CredentialStatus
         {
             Ok = true,
-            Summary = $"已保存（用户：{foundUser ?? "未知"}）",
-            Detail = $"凭据由 Git Credential Manager 保管在 Windows 凭据管理器，本工具不保存密码。"
+            Summary = Loc.F("Cred.SavedSummary", foundUser ?? Loc.T("Common.Unknown")),
+            Detail = Loc.T("Cred.SavedDetail")
         };
     }
 
@@ -143,15 +143,15 @@ public sealed class HttpsCredentialManager
         var target = RemoteUrl.GetHttpsTarget(remoteUrl);
         if (target is null)
         {
-            return new CredentialStatus { Ok = false, Summary = "地址不是 HTTPS", Detail = "SSH 地址不需要账号密码，请改用 SSH 密钥配置。" };
+            return new CredentialStatus { Ok = false, Summary = Loc.T("Cred.SaveNotHttpsSummary"), Detail = Loc.T("Cred.SaveNotHttpsDetail") };
         }
         if (string.IsNullOrWhiteSpace(username))
         {
-            return new CredentialStatus { Ok = false, Summary = "用户名为空", Detail = "请填写你的账号或用户名。" };
+            return new CredentialStatus { Ok = false, Summary = Loc.T("Cred.EmptyUserSummary"), Detail = Loc.T("Cred.EmptyUserDetail") };
         }
         if (string.IsNullOrEmpty(password))
         {
-            return new CredentialStatus { Ok = false, Summary = "密码或令牌为空", Detail = "请填写密码或个人访问令牌（PAT）。" };
+            return new CredentialStatus { Ok = false, Summary = Loc.T("Cred.EmptyPassSummary"), Detail = Loc.T("Cred.EmptyPassDetail") };
         }
 
         var (host, _) = target.Value;
@@ -168,7 +168,7 @@ public sealed class HttpsCredentialManager
             var wincred = FindWincred();
             if (wincred is not null)
             {
-                _log($"GCM 保存未生效，改用 wincred 保存 {host} 的凭据…");
+                _log(Loc.F("Log.GcmFallback", host));
                 _git.Run(CredentialArgs(wincred, "approve"), workDir: Environment.CurrentDirectory,
                     stdin: payload, timeout: TimeSpan.FromSeconds(60));
                 verify = Probe(remoteUrl);
@@ -178,16 +178,16 @@ public sealed class HttpsCredentialManager
         if (!verify.Ok)
         {
             var detail = GitClient.SanitizeGitNoise(r.Combined);
-            _log("保存凭据失败：" + detail);
+            _log(Loc.F("Log.SaveFail", detail));
             return new CredentialStatus
             {
                 Ok = false,
-                Summary = "保存失败",
-                Detail = "Git 没能写入凭据管理器：" + (string.IsNullOrWhiteSpace(detail) ? "未知原因" : detail)
+                Summary = Loc.T("Cred.SaveFailSummary"),
+                Detail = Loc.F("Cred.SaveFailDetail", string.IsNullOrWhiteSpace(detail) ? Loc.T("Common.Unknown") : detail)
             };
         }
 
-        _log($"已把 {host} 的凭据保存到 Windows 凭据管理器（本工具不保存密码）。");
+        _log(Loc.F("Log.CredSaved", host));
         return verify;
     }
 
@@ -197,7 +197,7 @@ public sealed class HttpsCredentialManager
         var target = RemoteUrl.GetHttpsTarget(remoteUrl);
         if (target is null)
         {
-            return new CredentialStatus { Ok = false, Summary = "地址不是 HTTPS", Detail = "没有可删除的 HTTPS 凭据。" };
+            return new CredentialStatus { Ok = false, Summary = Loc.T("Cred.EraseNotHttpsSummary"), Detail = Loc.T("Cred.EraseNotHttpsDetail") };
         }
 
         var (host, username) = target.Value;
@@ -210,12 +210,12 @@ public sealed class HttpsCredentialManager
             return new CredentialStatus
             {
                 Ok = false,
-                Summary = "删除失败",
+                Summary = Loc.T("Cred.DeleteFailSummary"),
                 Detail = GitClient.SanitizeGitNoise(r.Combined)
             };
         }
 
-        _log($"已删除 {host} 的已保存凭据。");
-        return new CredentialStatus { Ok = true, Summary = "已删除", Detail = "下次操作会要求重新输入。" };
+        _log(Loc.F("Log.CredDeleted", host));
+        return new CredentialStatus { Ok = true, Summary = Loc.T("Cred.DeletedSummary"), Detail = Loc.T("Cred.DeletedDetail") };
     }
 }

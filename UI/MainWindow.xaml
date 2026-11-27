@@ -2,7 +2,8 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:ctrl="clr-namespace:VendorSync.UI.Controls"
-        Title="GitSync · 同步项目" Height="800" Width="1180" MinHeight="640" MinWidth="960"
+        xmlns:loc="clr-namespace:VendorSync.UI"
+        Title="{loc:LocExt App.Title}" Height="800" Width="1180" MinHeight="640" MinWidth="960"
         Background="{StaticResource WindowBgBrush}"
         FontFamily="Microsoft YaHei UI" FontSize="13" TextOptions.TextFormattingMode="Display"
         UseLayoutRounding="True" WindowStartupLocation="CenterScreen"
@@ -14,9 +15,9 @@
             <Button Click="Card_Click" Cursor="Hand" Background="Transparent" BorderThickness="0" Padding="0">
                 <Button.ContextMenu>
                     <ContextMenu>
-                        <MenuItem Header="打开文件夹" Click="MenuOpenFolder_Click"/>
-                        <MenuItem Header="远程仓库设置…" Click="MenuRemotes_Click"/>
-                        <MenuItem Header="移除项目" Click="MenuRemove_Click"/>
+                        <MenuItem Header="{loc:LocExt Menu.OpenFolder}" Click="MenuOpenFolder_Click"/>
+                        <MenuItem Header="{loc:LocExt Menu.Remotes}" Click="MenuRemotes_Click"/>
+                        <MenuItem Header="{loc:LocExt Menu.Remove}" Click="MenuRemove_Click"/>
                     </ContextMenu>
                 </Button.ContextMenu>
                 <Border Margin="0,0,0,4">
@@ -47,12 +48,12 @@
             <StackPanel>
                 <DockPanel>
                     <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
-                        <Button Content="复制全部" Click="BtnCopyLog_Click" Style="{StaticResource LogButton}"/>
-                        <Button Content="复制诊断信息" Click="BtnCopyDiag_Click" Style="{StaticResource LogButton}"/>
-                        <Button Content="清空" Click="BtnClearLog_Click" Style="{StaticResource LogButton}"/>
-                        <Button x:Name="BtnLogToggle" Content="展开 ▲" Click="BtnLogToggle_Click" Style="{StaticResource LogButton}"/>
+                        <Button Content="{loc:LocExt Log.CopyAll}" Click="BtnCopyLog_Click" Style="{StaticResource LogButton}"/>
+                        <Button Content="{loc:LocExt Log.CopyDiag}" Click="BtnCopyDiag_Click" Style="{StaticResource LogButton}"/>
+                        <Button Content="{loc:LocExt Log.Clear}" Click="BtnClearLog_Click" Style="{StaticResource LogButton}"/>
+                        <Button x:Name="BtnLogToggle" Content="{loc:LocExt Log.Expand}" Click="BtnLogToggle_Click" Style="{StaticResource LogButton}"/>
                     </StackPanel>
-                    <TextBlock x:Name="LogOneLine" Text="日志" Foreground="#9AA4B2" FontSize="12"
+                    <TextBlock x:Name="LogOneLine" Text="{loc:LocExt Log.Title}" Foreground="#9AA4B2" FontSize="12"
                                VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
                 </DockPanel>
                 <TextBox x:Name="LogBox" Background="Transparent" Foreground="{StaticResource LogFgBrush}"
@@ -66,7 +67,7 @@
         <!-- 状态栏 -->
         <Border DockPanel.Dock="Bottom" Background="{StaticResource WindowBgBrush}" Padding="20,4">
             <DockPanel>
-                <TextBlock x:Name="StatusText" Text="正在启动…" Foreground="{StaticResource SubTextBrush}" FontSize="12"/>
+                <TextBlock x:Name="StatusText" Text="{loc:LocExt Status.Starting}" Foreground="{StaticResource SubTextBrush}" FontSize="12"/>
                 <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" HorizontalAlignment="Right">
                     <TextBlock x:Name="EnvText" Text="" Foreground="{StaticResource SubTextBrush}" FontSize="12"
                                VerticalAlignment="Center" Margin="0,0,14,0"/>
@@ -82,17 +83,20 @@
                 <StackPanel>
                     <DockPanel>
                         <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
-                            <Button Content="凭据与密钥" Click="BtnCredentials_Click" Style="{StaticResource BaseButton}"/>
-                            <Button x:Name="BtnAdd" Content="＋ 添加项目" Click="BtnAdd_Click" Margin="8,0,0,0"
+                            <Button x:Name="BtnLang" Content="{loc:LocExt Lang.SwitchTarget}" Click="BtnLang_Click"
+                                    Style="{StaticResource BaseButton}"/>
+                            <Button Content="{loc:LocExt Btn.Credentials}" Click="BtnCredentials_Click" Margin="8,0,0,0"
+                                    Style="{StaticResource BaseButton}"/>
+                            <Button x:Name="BtnAdd" Content="{loc:LocExt Btn.Add}" Click="BtnAdd_Click" Margin="8,0,0,0"
                                     Style="{StaticResource PrimaryButton}"/>
                         </StackPanel>
                         <StackPanel>
-                            <TextBlock Text="同步项目" FontSize="24" FontWeight="Bold"/>
+                            <TextBlock Text="{loc:LocExt Home.Title}" FontSize="24" FontWeight="Bold"/>
                             <TextBlock x:Name="HomeSummary" Text="" Foreground="{StaticResource SubTextBrush}" Margin="0,4,0,0"/>
                         </StackPanel>
                     </DockPanel>
 
-                    <TextBlock x:Name="EmptyHint" Text="还没有同步项目。点「＋ 添加项目」，选一个本地仓库或直接克隆一个新仓库。"
+                    <TextBlock x:Name="EmptyHint" Text="{loc:LocExt Home.Empty}"
                                Foreground="{StaticResource SubTextBrush}" FontSize="14" Margin="0,40,0,0"
                                TextWrapping="Wrap" Visibility="Collapsed"/>
 
@@ -112,9 +116,9 @@
             <ScrollViewer VerticalScrollBarVisibility="Auto">
                 <StackPanel>
                     <DockPanel>
-                        <Button DockPanel.Dock="Right" Content="凭据与密钥" Click="BtnCredentials_Click"
+                        <Button DockPanel.Dock="Right" Content="{loc:LocExt Btn.Credentials}" Click="BtnCredentials_Click"
                                 Style="{StaticResource BaseButton}" VerticalAlignment="Center" Margin="8,0,0,0"/>
-                        <Button DockPanel.Dock="Left" Content="← 返回" Click="BtnBack_Click"
+                        <Button DockPanel.Dock="Left" Content="{loc:LocExt Detail.Back}" Click="BtnBack_Click"
                                 Style="{StaticResource BaseButton}" VerticalAlignment="Center" Margin="0,0,12,0"/>
                         <TextBlock x:Name="DetailTitle" Text="" FontSize="20" FontWeight="Bold" VerticalAlignment="Center"
                                    TextTrimming="CharacterEllipsis"/>
@@ -124,7 +128,7 @@
                     <DockPanel Margin="0,14,0,0">
                         <ctrl:Neu DockPanel.Dock="Right" Depth="Inset" CornerRadius="10" Padding="12,8" Width="360">
                             <StackPanel>
-                                <TextBlock Text="目标仓库" FontSize="11" Foreground="{StaticResource SubTextBrush}"/>
+                                <TextBlock Text="{loc:LocExt Detail.Target}" FontSize="11" Foreground="{StaticResource SubTextBrush}"/>
                                 <TextBlock x:Name="DetailTarget" Text="—" FontFamily="Consolas" FontSize="11.5"
                                            TextTrimming="CharacterEllipsis" Margin="0,3,0,0"/>
                             </StackPanel>
@@ -133,7 +137,7 @@
                                    VerticalAlignment="Center" Margin="12,0,12,0"/>
                         <ctrl:Neu Depth="Inset" CornerRadius="10" Padding="12,8">
                             <StackPanel>
-                                <TextBlock Text="源仓库" FontSize="11" Foreground="{StaticResource SubTextBrush}"/>
+                                <TextBlock Text="{loc:LocExt Detail.Source}" FontSize="11" Foreground="{StaticResource SubTextBrush}"/>
                                 <TextBlock x:Name="DetailSource" Text="—" FontFamily="Consolas" FontSize="11.5"
                                            TextTrimming="CharacterEllipsis" Margin="0,3,0,0"/>
                             </StackPanel>
@@ -149,41 +153,41 @@
                             <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
                                 <TextBlock x:Name="DetailPercent" Text="" HorizontalAlignment="Center"
                                            FontSize="20" FontWeight="Bold"/>
-                                <TextBlock x:Name="DetailKnobText" Text="同步" HorizontalAlignment="Center" FontSize="12"
+                                <TextBlock x:Name="DetailKnobText" Text="{loc:LocExt Detail.Sync}" HorizontalAlignment="Center" FontSize="12"
                                            Foreground="{StaticResource SubTextBrush}"/>
                             </StackPanel>
                         </Grid>
 
                         <StackPanel>
                             <StackPanel Orientation="Horizontal" x:Name="DetailSteps">
-                                <TextBlock x:Name="StepConn" Text="① 连接" FontSize="12" Foreground="#8A94A6"/>
+                                <TextBlock x:Name="StepConn" Text="{loc:LocExt Step.Conn}" FontSize="12" Foreground="#8A94A6"/>
                                 <TextBlock Text="  —  " Foreground="#C0C8D4" FontSize="12"/>
-                                <TextBlock x:Name="StepCheck" Text="② 检查差异" FontSize="12" Foreground="#8A94A6"/>
+                                <TextBlock x:Name="StepCheck" Text="{loc:LocExt Step.Check}" FontSize="12" Foreground="#8A94A6"/>
                                 <TextBlock Text="  —  " Foreground="#C0C8D4" FontSize="12"/>
-                                <TextBlock x:Name="StepPush" Text="③ 推送" FontSize="12" Foreground="#8A94A6"/>
+                                <TextBlock x:Name="StepPush" Text="{loc:LocExt Step.Push}" FontSize="12" Foreground="#8A94A6"/>
                                 <TextBlock Text="  —  " Foreground="#C0C8D4" FontSize="12"/>
-                                <TextBlock x:Name="StepVerify" Text="④ 校验" FontSize="12" Foreground="#8A94A6"/>
+                                <TextBlock x:Name="StepVerify" Text="{loc:LocExt Step.Verify}" FontSize="12" Foreground="#8A94A6"/>
                             </StackPanel>
                             <TextBlock x:Name="DetailSummary" Text="" TextWrapping="Wrap" FontSize="13.5" Margin="0,10,0,0"/>
 
                             <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
                                 <ComboBox x:Name="DetailStrategy" Height="30" Width="230" VerticalContentAlignment="Center"
                                           SelectionChanged="DetailStrategy_Changed">
-                                    <ComboBoxItem Content="以源仓库为准（覆盖目标仓库）"/>
-                                    <ComboBoxItem Content="保留双方提交（合并）"/>
+                                    <ComboBoxItem Content="{loc:LocExt Strategy.Force}"/>
+                                    <ComboBoxItem Content="{loc:LocExt Strategy.Merge}"/>
                                 </ComboBox>
-                                <CheckBox x:Name="DetailTags" Content="同时同步标签" VerticalContentAlignment="Center"
+                                <CheckBox x:Name="DetailTags" Content="{loc:LocExt Detail.IncludeTags}" VerticalContentAlignment="Center"
                                           Margin="14,0,0,0" Checked="DetailTags_Changed" Unchecked="DetailTags_Changed"/>
                             </StackPanel>
 
                             <StackPanel Orientation="Horizontal" Margin="0,14,0,0">
-                                <Button x:Name="BtnDetailSync" Content="同步" Style="{StaticResource PrimaryButton}"
+                                <Button x:Name="BtnDetailSync" Content="{loc:LocExt Detail.Sync}" Style="{StaticResource PrimaryButton}"
                                         Click="BtnDetailSync_Click"/>
-                                <Button x:Name="BtnDetailCheck" Content="重新检查" Style="{StaticResource BaseButton}"
+                                <Button x:Name="BtnDetailCheck" Content="{loc:LocExt Detail.Recheck}" Style="{StaticResource BaseButton}"
                                         Click="BtnDetailCheck_Click" Margin="10,0,0,0"/>
-                                <Button x:Name="BtnDetailRemotes" Content="远程仓库…" Style="{StaticResource BaseButton}"
+                                <Button x:Name="BtnDetailRemotes" Content="{loc:LocExt Detail.Remotes}" Style="{StaticResource BaseButton}"
                                         Click="BtnDetailRemotes_Click" Margin="10,0,0,0"
-                                        ToolTip="设置这个项目的源 / 目标远程仓库名字和地址"/>
+                                        ToolTip="{loc:LocExt Detail.RemotesTip}"/>
                             </StackPanel>
                         </StackPanel>
                     </DockPanel>
@@ -192,8 +196,8 @@
                     <ctrl:Neu Depth="Inset" CornerRadius="12" Padding="4,8" Margin="0,16,0,0">
                         <StackPanel>
                             <DockPanel Margin="10,0">
-                                <ToggleButton x:Name="BranchToggle" Content="只看需处理的" IsChecked="False" Style="{StaticResource Chip}"
-                                              Click="BranchToggle_Click" ToolTip="勾选后只显示需要同步的分支，隐藏已一致的"/>
+                                <ToggleButton x:Name="BranchToggle" Content="{loc:LocExt Branch.OnlyPending}" IsChecked="False" Style="{StaticResource Chip}"
+                                              Click="BranchToggle_Click" ToolTip="{loc:LocExt Branch.OnlyPendingTip}"/>
                                 <TextBlock x:Name="BranchSummary" Text="" VerticalAlignment="Center" FontSize="12"
                                            Foreground="{StaticResource SubTextBrush}"/>
                             </DockPanel>

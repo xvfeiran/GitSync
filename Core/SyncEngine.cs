@@ -51,13 +51,13 @@ public sealed class BranchStatus
 
     public string StateLabel => State switch
     {
-        BranchState.UpToDate => "一致",
-        BranchState.Behind => "落后",
-        BranchState.New => "新分支",
-        BranchState.InternalAhead => "目标领先",
-        BranchState.Diverged => "分叉",
-        BranchState.VendorGone => "源已删",
-        _ => "未知"
+        BranchState.UpToDate => Loc.T("StateLabel.UpToDate"),
+        BranchState.Behind => Loc.T("StateLabel.Behind"),
+        BranchState.New => Loc.T("StateLabel.New"),
+        BranchState.InternalAhead => Loc.T("StateLabel.InternalAhead"),
+        BranchState.Diverged => Loc.T("StateLabel.Diverged"),
+        BranchState.VendorGone => Loc.T("StateLabel.VendorGone"),
+        _ => Loc.T("StateLabel.Unknown")
     };
 
     public bool NeedsPush => State is BranchState.Behind or BranchState.New or BranchState.Diverged;
@@ -108,7 +108,7 @@ public sealed class SyncEngine
         error = string.Empty;
 
         // 两个远程互不依赖，并行拉取，快进检查启动速度。
-        Info($"并行拉取源仓库 {options.VendorRemote} 与目标仓库 {options.InternalRemote}…");
+        Info(Loc.F("Log.FetchParallel", options.VendorRemote, options.InternalRemote));
         var vendorTask = Task.Run(() => _git.Fetch(options.RepoPath, options.VendorRemote, tags: options.IncludeTags));
         var internalTask = Task.Run(() => _git.Run(
             new[] { "fetch", options.InternalRemote, "--prune", "--no-write-fetch-head" },
@@ -116,7 +116,7 @@ public sealed class SyncEngine
 
         ProcessResult vendorFetch, internalFetch;
         try { vendorFetch = vendorTask.GetAwaiter().GetResult(); }
-        catch (Exception ex) { error = $"拉取源仓库失败：{ex.Message}"; Info(error); return false; }
+        catch (Exception ex) { error = Loc.F("Err.FetchSource", ex.Message); Info(error); return false; }
         foreach (var line in GitClient.SanitizeGitNoise(vendorFetch.Combined).Split('\n', StringSplitOptions.RemoveEmptyEntries))
         {
             Info("  " + line);
@@ -124,22 +124,22 @@ public sealed class SyncEngine
         if (vendorFetch.ExitCode != 0)
         {
             var (_, problem, hint) = GitProblem.Explain(vendorFetch, options.VendorRemote);
-            error = $"拉取源仓库失败：{problem}\n{hint}";
+            error = Loc.F("Err.FetchSource", $"{problem}\n{hint}");
             Info(error);
             return false;
         }
-        Info("  源仓库已更新。");
+        Info(Loc.T("Log.SourceUpdated"));
 
         try { internalFetch = internalTask.GetAwaiter().GetResult(); }
-        catch (Exception ex) { error = $"读取目标仓库失败：{ex.Message}"; Info(error); return false; }
+        catch (Exception ex) { error = Loc.F("Err.ReadTarget", ex.Message); Info(error); return false; }
         if (internalFetch.ExitCode != 0)
         {
             var (_, problem, hint) = GitProblem.Explain(internalFetch, options.InternalRemote);
-            error = $"读取目标仓库失败：{problem}\n{hint}";
+            error = Loc.F("Err.ReadTarget", $"{problem}\n{hint}");
             Info(error);
             return false;
         }
-        Info("  目标仓库已更新。");
+        Info(Loc.T("Log.TargetUpdated"));
         return true;
     }
 
@@ -150,7 +150,7 @@ public sealed class SyncEngine
         var vendorBranches = _git.GetRemoteBranches(options.RepoPath, options.VendorRemote);
         if (vendorBranches.Count == 0)
         {
-            throw new InvalidOperationException($"源仓库远程 {options.VendorRemote} 上没有找到任何分支。");
+            throw new InvalidOperationException(Loc.F("Err.InspectNoBranches", options.VendorRemote));
         }
 
         if (options.OnlyBranches is { Count: > 0 })
@@ -228,17 +228,17 @@ public sealed class SyncEngine
         {
             return status.State switch
             {
-                BranchState.UpToDate => Skip(status, "两边一致，无需上传"),
+                BranchState.UpToDate => Skip(status, Loc.T("Outcome.SkipUpToDate")),
                 BranchState.InternalAhead => options.Strategy == SyncStrategy.Force
                     ? ForcePush(options, status)
-                    : Skip(status, $"目标仓库领先 {status.InternalOnly} 个提交，不需要上传"),
-                BranchState.VendorGone => Skip(status, "源仓库端已删除该分支，未做处理（不自动删除目标仓库对应分支）"),
+                    : Skip(status, Loc.F("Outcome.SkipInternalAhead", status.InternalOnly)),
+                BranchState.VendorGone => Skip(status, Loc.T("Outcome.SkipVendorGone")),
                 BranchState.New => PushDirect(options, status, SyncActionKind.CreateBranch),
                 BranchState.Behind => PushDirect(options, status, SyncActionKind.FastForward),
                 BranchState.Diverged => options.Strategy == SyncStrategy.Force
                     ? ForcePush(options, status)
                     : MergeAndPush(options, status),
-                _ => Fail(status, "无法判断分支状态")
+                _ => Fail(status, Loc.T("Outcome.UnknownState"))
             };
         }
         catch (Exception ex)
@@ -249,20 +249,20 @@ public sealed class SyncEngine
 
     private SyncOutcome Skip(BranchStatus s, string message)
     {
-        Info($"[跳过] {s.Name}：{message}");
+        Info(Loc.F("Log.Skip", s.Name, message));
         return new SyncOutcome { Branch = s.Name, State = s.State, Action = SyncActionKind.Skip, Success = true, Message = message };
     }
 
     private SyncOutcome Fail(BranchStatus s, string message)
     {
-        Info($"[失败] {s.Name}：{message}");
+        Info(Loc.F("Log.Fail", s.Name, message));
         return new SyncOutcome { Branch = s.Name, State = s.State, Action = SyncActionKind.Failed, Success = false, Message = message };
     }
 
     private SyncOutcome PushDirect(SyncOptions options, BranchStatus s, SyncActionKind kind)
     {
         var refspec = $"refs/remotes/{options.VendorRemote}/{s.Name}:refs/heads/{s.Name}";
-        Info($"[上传] {s.Name}：{s.StateLabel}，推送 {s.VendorShort} …");
+        Info(Loc.F("Log.Push", s.Name, s.StateLabel, s.VendorShort));
 
         var r = _git.Run(new[] { "push", options.InternalRemote, refspec }, options.RepoPath, timeout: TimeSpan.FromMinutes(10));
         if (r.ExitCode != 0)
@@ -272,11 +272,11 @@ public sealed class SyncEngine
             return Fail(s, $"{problem}\n{hint}");
         }
 
-        Info($"  [成功] {s.Name} → {s.VendorShort}");
+        Info(Loc.F("Log.PushOk", s.Name, s.VendorShort));
         return new SyncOutcome
         {
             Branch = s.Name, State = s.State, Action = kind, Success = true,
-            Message = kind == SyncActionKind.CreateBranch ? "已新建目标分支" : $"已快进 {s.VendorOnly} 个提交",
+            Message = kind == SyncActionKind.CreateBranch ? Loc.T("Msg.CreatedBranch") : Loc.F("Msg.FastForward", s.VendorOnly),
             ResultSha = s.VendorSha
         };
     }
@@ -285,13 +285,13 @@ public sealed class SyncEngine
     {
         var internalRef = $"refs/remotes/{options.InternalRemote}/{s.Name}";
         var expected = _git.ResolveRef(options.RepoPath, internalRef);
-        if (expected is null) return Fail(s, "读不到目标分支当前哈希，放弃强制推送。");
+        if (expected is null) return Fail(s, Loc.T("Err.NoTargetSha"));
 
         // 不做备份：目标仓库独有的提交直接丢弃。原哈希写进日志，便于必要时人工找回。
-        Info($"[强制] {s.Name}：用源仓库 {s.VendorShort} 覆盖目标仓库（原指向 {BranchStatus.Short(expected)}，保护性 lease）…");
+        Info(Loc.F("Log.Force", s.Name, s.VendorShort, BranchStatus.Short(expected)));
         if (s.InternalOnlyCommits.Count > 0)
         {
-            Info("  将被丢弃的目标仓库提交（不备份）：");
+            Info(Loc.T("Log.ForceDiscard"));
             foreach (var c in s.InternalOnlyCommits) Info("    " + c);
         }
 
@@ -306,11 +306,11 @@ public sealed class SyncEngine
             return Fail(s, $"{problem}\n{hint}");
         }
 
-        Info($"  [成功] {s.Name} 已覆盖为 {s.VendorShort}");
+        Info(Loc.F("Log.ForceOk", s.Name, s.VendorShort));
         return new SyncOutcome
         {
             Branch = s.Name, State = s.State, Action = SyncActionKind.ForcePush, Success = true,
-            Message = "已用源仓库版本覆盖", ResultSha = s.VendorSha
+            Message = Loc.T("Msg.Overwritten"), ResultSha = s.VendorSha
         };
     }
 
@@ -320,8 +320,8 @@ public sealed class SyncEngine
         var tempDir = Path.Combine(TempRoot.Dir(), "vendor-sync-" + Guid.NewGuid().ToString("N")[..8]);
         var internalRef = $"refs/remotes/{options.InternalRemote}/{s.Name}";
 
-        Info($"[合并] {s.Name}：目标仓库独有 {s.InternalOnly} 个 / 源仓库独有 {s.VendorOnly} 个，生成合并提交…");
-        foreach (var c in s.InternalOnlyCommits) Info("    目标仓库提交: " + c);
+        Info(Loc.F("Log.Merge", s.Name, s.InternalOnly, s.VendorOnly));
+        foreach (var c in s.InternalOnlyCommits) Info(Loc.T("Log.MergeTargetCommit") + c);
 
         try
         {
@@ -333,7 +333,7 @@ public sealed class SyncEngine
                 options.RepoPath, timeout: TimeSpan.FromMinutes(5));
             if (add.ExitCode != 0)
             {
-                return Fail(s, "无法创建临时工作区：" + GitClient.SanitizeGitNoise(add.Combined));
+                return Fail(s, Loc.F("Err.WorktreeFail", GitClient.SanitizeGitNoise(add.Combined)));
             }
 
             var message = $"merge: 同步 {options.VendorRemote}/{s.Name} → {options.InternalRemote}/{s.Name}（源 {s.VendorShort}）";
@@ -348,9 +348,9 @@ public sealed class SyncEngine
                 var files = conflicted.StdOut
                     .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
                 var detail = files.Length > 0
-                    ? "冲突文件：" + string.Join(", ", files)
+                    ? Loc.F("Err.MergeConflictFiles", string.Join(", ", files))
                     : GitClient.SanitizeGitNoise(merge.Combined);
-                return Fail(s, "合并冲突，已放弃本次合并（目标仓库保持不变）。" + detail);
+                return Fail(s, Loc.F("Err.MergeConflict", detail));
             }
 
             var head = _git.ResolveRef(tempDir, "HEAD");
@@ -359,14 +359,14 @@ public sealed class SyncEngine
             if (push.ExitCode != 0)
             {
                 var (_, problem, hint) = GitProblem.Explain(push, options.InternalRemote);
-                return Fail(s, $"合并提交已生成但推送被拒：{problem}\n{hint}");
+                return Fail(s, Loc.F("Err.MergePushRejected", $"{problem}\n{hint}"));
             }
 
-            Info($"  [成功] {s.Name} 已合并并上传 {BranchStatus.Short(head)}");
+            Info(Loc.F("Log.MergeOk", s.Name, BranchStatus.Short(head)));
             return new SyncOutcome
             {
                 Branch = s.Name, State = s.State, Action = SyncActionKind.MergeAndPush, Success = true,
-                Message = "已合并双方提交并上传", ResultSha = head
+                Message = Loc.T("Msg.Merged"), ResultSha = head
             };
         }
         finally
@@ -410,12 +410,12 @@ public sealed class SyncEngine
         {
             if (_git.PushTag(options.RepoPath, options.InternalRemote, tag))
             {
-                Info($"  [标签] 新增 {tag}");
+                Info(Loc.F("Log.TagNew", tag));
                 pushed++;
             }
             else
             {
-                Info($"  ⚠ 标签 {tag} 推送失败");
+                Info(Loc.F("Log.TagFail", tag));
                 failed++;
             }
         }

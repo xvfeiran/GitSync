@@ -66,12 +66,12 @@ public partial class RemoteSettingsDialog : Window
         var internalRemote = InternalRemote;
         if (vendor.Length == 0 || internalRemote.Length == 0)
         {
-            Prompt.Warn(this, "两个远程名都不能为空。", "缺少远程名");
+            Prompt.Warn(this, Loc.T("Remote.WarnEmpty"), Loc.T("Caption.MissingRemote"));
             return;
         }
         if (string.Equals(vendor, internalRemote, StringComparison.Ordinal))
         {
-            Prompt.Warn(this, "源仓库和目标仓库不能用同一个远程名。", "远程名重复");
+            Prompt.Warn(this, Loc.T("Remote.WarnSame"), Loc.T("Caption.RemoteDuplicate"));
             return;
         }
         if (_git is not null && Directory.Exists(_repo))
@@ -84,12 +84,12 @@ public partial class RemoteSettingsDialog : Window
                 if (url.Length == 0) url = _git.GetRemoteUrl(_repo, name) ?? string.Empty;
                 if (url.Length == 0)
                 {
-                    Prompt.Warn(this, $"远程「{name}」还没有地址，请填一个仓库地址（HTTPS 或 SSH）。", "缺少地址");
+                    Prompt.Warn(this, Loc.F("Remote.WarnNoUrl", name), Loc.T("Caption.MissingUrl"));
                     return;
                 }
                 if (!_git.EnsureRemote(_repo, name, url))
                 {
-                    Prompt.Warn(this, $"设置远程「{name}」失败，详情见日志。", "设置失败");
+                    Prompt.Warn(this, Loc.F("Remote.WarnFail", name), Loc.T("Caption.SetFail"));
                     return;
                 }
                 AppLog.Write($"已设置远程 {name} → {url}");

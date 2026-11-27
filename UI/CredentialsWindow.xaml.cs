@@ -48,12 +48,12 @@ public partial class CredentialsWindow : Window
 
         if (keys.Count > 0)
         {
-            SetStatus(SshStatus, true, $"找到 {keys.Count} 把密钥");
+            SetStatus(SshStatus, true, Loc.F("Cred.FoundKeys", keys.Count));
             KeyList.SelectedIndex = 0;
         }
         else
         {
-            SetStatus(SshStatus, false, "本机还没有 SSH 密钥 —— 点「① 生成 ed25519 密钥」开始");
+            SetStatus(SshStatus, false, Loc.T("Cred.NoKeys"));
             PublicKey.Text = string.Empty;
         }
     }
@@ -66,8 +66,8 @@ public partial class CredentialsWindow : Window
     private void GenerateKey_Click(object sender, RoutedEventArgs e)
     {
         if (!Prompt.Confirm(this,
-                "将在 ~/.ssh 下生成一把新密钥，并把私钥权限限制为仅当前用户可读。\r\n私钥不会被上传到任何地方。继续？",
-                "生成 SSH 密钥")) return;
+                Loc.T("Cred.ConfirmGenerate"),
+                Loc.T("Caption.GenSshKey"))) return;
 
         BtnGenerate.IsEnabled = false;
         try
@@ -76,11 +76,11 @@ public partial class CredentialsWindow : Window
             var (ok, message, key) = manager.Generate(KeyComment.Text.Trim());
             if (ok)
             {
-                Prompt.Info(this, message + "\r\n\r\n下一步：点「② 复制公钥」，把它登记到 Git 服务器。", "已生成");
+                Prompt.Info(this, Loc.F("Cred.GeneratedNext", message), Loc.T("Caption.Generated"));
                 RefreshKeys();
                 if (key is not null) PublicKey.Text = key.PublicKey;
             }
-            else Prompt.Warn(this, message, "生成失败");
+            else Prompt.Warn(this, message, Loc.T("Caption.GenerateFail"));
         }
         finally { BtnGenerate.IsEnabled = true; }
     }
@@ -90,17 +90,17 @@ public partial class CredentialsWindow : Window
         var text = PublicKey.Text.Trim();
         if (string.IsNullOrEmpty(text))
         {
-            Prompt.Info(this, "没有可复制的公钥。先选中一把密钥或生成新的。", "无可复制内容");
+            Prompt.Info(this, Loc.T("Cred.NothingToCopy"), Loc.T("Caption.NothingToCopy"));
             return;
         }
         try
         {
             Clipboard.SetText(text);
-            SetStatus(SshStatus, true, "公钥已复制 —— 下一步到登记页粘贴");
+            SetStatus(SshStatus, true, Loc.T("Cred.PubCopied"));
         }
         catch (Exception)
         {
-            Prompt.Warn(this, "复制失败（剪贴板被其他程序占用）。", "复制失败");
+            Prompt.Warn(this, Loc.T("Cred.CopyFail"), Loc.T("Caption.CopyFail"));
         }
     }
 
@@ -112,9 +112,8 @@ public partial class CredentialsWindow : Window
         if (string.IsNullOrEmpty(host))
         {
             Prompt.Info(this,
-                "当前项目的远程都不是 SSH 地址，推断不出 Git 服务器的网页地址。\r\n" +
-                "请自行打开你的 Git 服务器，进入个人设置 → SSH Keys 页面粘贴公钥。",
-                "请手动打开登记页");
+                Loc.T("Cred.NoSshUrl"),
+                Loc.T("Caption.ManualRegister"));
             return;
         }
         OpenUrl("https://" + host);
@@ -125,7 +124,7 @@ public partial class CredentialsWindow : Window
         var url = SshUrl;
         if (url is null)
         {
-            Prompt.Info(this, "当前没有 SSH 远程地址可测试。", "无需测试");
+            Prompt.Info(this, Loc.T("Cred.NoSshTest"), Loc.T("Caption.NoNeedTest"));
             return;
         }
         var host = RemoteUrl.GetSshHost(url);
@@ -133,12 +132,12 @@ public partial class CredentialsWindow : Window
         if (string.IsNullOrEmpty(host)) return;
 
         BtnTest.IsEnabled = false;
-        SshResult.Text = $"正在连接 git@{host}:{port} …";
+        SshResult.Text = Loc.F("Cred.Connecting", host, port);
         try
         {
             var manager = new SshKeyManager(m => AppLog.Write(m));
             var result = manager.TestConnection(host, port);
-            SetStatus(SshStatus, result.Ok, result.Ok ? "SSH 认证成功，本地和远程已连通" : "SSH 认证失败");
+            SetStatus(SshStatus, result.Ok, result.Ok ? Loc.T("Cred.SshOk") : Loc.T("Cred.SshFail"));
             SshResult.Text = result.Message + (string.IsNullOrWhiteSpace(result.RawOutput)
                 ? string.Empty : "\r\n\r\n" + result.RawOutput);
         }
@@ -154,15 +153,15 @@ public partial class CredentialsWindow : Window
         var repo = _config.RepoPath;
         if (string.IsNullOrWhiteSpace(repo) || !_git.IsRepository(repo))
         {
-            SetStatus(HttpsStatus, false, "还没有选择有效的仓库目录");
+            SetStatus(HttpsStatus, false, Loc.T("Cred.NoRepo"));
             return;
         }
 
         var diagnosis = CredentialHelperResolver.Diagnose(_git);
         if (diagnosis.NeedsRepair)
         {
-            SetStatus(HttpsStatus, false, "凭据辅助程序配置有问题，HTTPS 凭据无法使用");
-            HttpsHint.Text = diagnosis.Detail + "\r\n本程序已自动绕过这个问题；要永久修好这台机器，点「永久修复本机 Git 配置」。";
+            SetStatus(HttpsStatus, false, Loc.T("Cred.BrokenHelper"));
+            HttpsHint.Text = Loc.F("Cred.BrokenHelperHint", diagnosis.Detail);
             if (diagnosis.ReplacementPath is not null)
             {
                 _repairHelperPath = diagnosis.ReplacementPath;
@@ -176,34 +175,34 @@ public partial class CredentialsWindow : Window
         var httpsUrl = HttpsUrl;
         if (httpsUrl is null)
         {
-            SetStatus(HttpsStatus, true, "两个远程都是 SSH 地址，不需要 HTTPS 凭据");
-            HttpsHint.Text = "你的配置走 SSH，请到「SSH 密钥」页生成并登记密钥。";
+            SetStatus(HttpsStatus, true, Loc.T("Cred.AllSsh"));
+            HttpsHint.Text = Loc.T("Cred.UseSshHint");
             return;
         }
 
         var manager = new HttpsCredentialManager(_git, m => AppLog.Write(m));
         var status = manager.Probe(httpsUrl);
         SetStatus(HttpsStatus, status.Ok, status.Summary);
-        HttpsHint.Text = status.Detail + $"\r\n地址：{RemoteUrl.Redact(httpsUrl)}";
+        HttpsHint.Text = status.Detail + Loc.F("Cred.Addr", RemoteUrl.Redact(httpsUrl)).Insert(0, "\r\n");
     }
 
     private void RepairHelper_Click(object sender, RoutedEventArgs e)
     {
         if (_repairHelperPath is null) return;
         if (!Prompt.Confirm(this,
-                "将要执行：\r\n\r\n" +
-                "  git config --global --replace-all credential.helper \"\"\r\n" +
-                $"  git config --global --add credential.helper \"{_repairHelperPath}\"\r\n\r\n" +
-                "这会把用户级 ~/.gitconfig 里的 credential.helper 改成可用的路径。\r\n只影响凭据辅助程序，不动其它配置。继续？",
-                "永久修复 Git 凭据配置")) return;
+                Loc.T("Cred.ConfirmRepairHead") +
+                Loc.T("Cred.ConfirmRepairLine1") +
+                Loc.F("Cred.ConfirmRepairLine2", _repairHelperPath) +
+                Loc.T("Cred.ConfirmRepairTail"),
+                Loc.T("Caption.RepairGit"))) return;
 
         var (ok, message) = CredentialHelperResolver.PersistToUserConfig(_git, _repairHelperPath);
         if (ok)
         {
             _git.CredentialOverride = Array.Empty<string>();
-            Prompt.Info(this, "已修好。之后这台机器上的所有 git 操作都会正常使用凭据。", "修复完成");
+            Prompt.Info(this, Loc.T("Cred.RepairOk"), Loc.T("Caption.RepairOk"));
         }
-        else Prompt.Warn(this, "修复失败：" + message, "修复失败");
+        else Prompt.Warn(this, Loc.F("Cred.RepairFail", message), Loc.T("Caption.RepairFail"));
         RefreshHttpsStatus();
     }
 
@@ -221,7 +220,7 @@ public partial class CredentialsWindow : Window
         }
         catch (Exception ex)
         {
-            Prompt.Warn(null, "打不开浏览器：" + ex.Message, "打开失败");
+            Prompt.Warn(null, Loc.F("Cred.BrowserFail", ex.Message), Loc.T("Caption.OpenFail"));
         }
     }
 }
@@ -234,5 +233,5 @@ public class KeyItem
     public KeyItem(SshKeyInfo info) => Info = info;
 
     public string Display =>
-        $"{System.IO.Path.GetFileName(Info.Path)}  ·  {Info.KeyType}  ·  {(string.IsNullOrEmpty(Info.Fingerprint) ? "（无法计算）" : Info.Fingerprint)}  ·  {Info.Comment}";
+        $"{System.IO.Path.GetFileName(Info.Path)}  ·  {Info.KeyType}  ·  {(string.IsNullOrEmpty(Info.Fingerprint) ? Loc.T("KeyItem.FingerprintUnavailable") : Info.Fingerprint)}  ·  {Info.Comment}";
 }

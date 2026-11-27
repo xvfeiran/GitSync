@@ -194,7 +194,7 @@ public sealed class SshKeyManager
         var keygen = LocateSshKeygen();
         if (keygen is null)
         {
-            return (false, "找不到 ssh-keygen.exe。请确认已安装 Git for Windows（它自带 OpenSSH）。", null);
+            return (false, Loc.T("Err.NoSshKeygen"), null);
         }
 
         Directory.CreateDirectory(SshDirectory);
@@ -202,13 +202,13 @@ public sealed class SshKeyManager
         var name = string.IsNullOrWhiteSpace(fileName) ? "id_ed25519" : fileName.Trim();
         if (name.Contains("..") || name.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0)
         {
-            return (false, "文件名不合法。", null);
+            return (false, Loc.T("Err.BadFileName"), null);
         }
 
         var target = Path.Combine(SshDirectory, name);
         if (File.Exists(target))
         {
-            return (false, $"已存在同名密钥：{target}。换个名字，或先手工处理现有文件（本工具不会覆盖密钥）。", null);
+            return (false, Loc.F("Err.KeyExists", target), null);
         }
 
         var safeComment = string.IsNullOrWhiteSpace(comment) ? $"{Environment.UserName}@{Environment.MachineName}" : comment.Trim();
@@ -218,16 +218,16 @@ public sealed class SshKeyManager
 
         if (r.ExitCode != 0 || !File.Exists(target))
         {
-            return (false, "生成密钥失败：" + GitClient.SanitizeGitNoise(r.Combined), null);
+            return (false, Loc.F("Err.KeygenFail", GitClient.SanitizeGitNoise(r.Combined)), null);
         }
 
         TryRestrictAcl(target);
 
         var info = DescribeKey(target, target + ".pub");
-        if (info is null) return (false, "密钥已生成但读取公钥失败。", null);
+        if (info is null) return (false, Loc.T("Err.KeyReadFail"), null);
 
-        _log($"已生成 SSH 密钥：{target}（类型 {info.KeyType}，指纹 {info.Fingerprint}）");
-        return (true, "已生成密钥。请把公钥登记到 Git 服务器的 SSH keys 页面。", info);
+        _log(Loc.F("Log.KeyGenerated", target, info.KeyType, info.Fingerprint));
+        return (true, Loc.T("Msg.KeyGenerated"), info);
     }
 
     /// <summary>收紧私钥文件权限：去掉继承，只保留当前用户。失败不阻断主流程。</summary>
@@ -249,11 +249,11 @@ public sealed class SshKeyManager
         var ssh = LocateSsh();
         if (ssh is null)
         {
-            return new SshTestResult { Ok = false, Message = "找不到 ssh.exe。" };
+            return new SshTestResult { Ok = false, Message = Loc.T("Err.NoSsh") };
         }
         if (string.IsNullOrWhiteSpace(host))
         {
-            return new SshTestResult { Ok = false, Message = "远程地址里没有主机名。" };
+            return new SshTestResult { Ok = false, Message = Loc.T("Err.NoHost") };
         }
 
         var args = new List<string>
@@ -278,20 +278,20 @@ public sealed class SshKeyManager
             lowered.Contains("welcome to gitlab") ||
             lowered.Contains("authenticated"))
         {
-            return new SshTestResult { Ok = true, Message = "认证成功。", RawOutput = output };
+            return new SshTestResult { Ok = true, Message = Loc.T("Ssh.AuthOk"), RawOutput = output };
         }
         if (lowered.Contains("permission denied"))
         {
             return new SshTestResult
             {
                 Ok = false,
-                Message = "服务器不认识这把密钥。请确认公钥已登记到 Git 服务器的个人设置 → SSH keys 页面。",
+                Message = Loc.T("Ssh.PermDenied"),
                 RawOutput = output
             };
         }
         if (lowered.Contains("host key verification failed"))
         {
-            return new SshTestResult { Ok = false, Message = "主机指纹校验失败，请联系 IT 确认。", RawOutput = output };
+            return new SshTestResult { Ok = false, Message = Loc.T("Ssh.HostKeyFail"), RawOutput = output };
         }
         if (lowered.Contains("connection timed out") || lowered.Contains("connection refused") ||
             lowered.Contains("could not resolve"))
@@ -299,7 +299,7 @@ public sealed class SshKeyManager
             return new SshTestResult
             {
                 Ok = false,
-                Message = "连不上服务器：检查网络、VPN 与端口。",
+                Message = Loc.T("Ssh.CantConnect"),
                 RawOutput = output
             };
         }
@@ -307,7 +307,7 @@ public sealed class SshKeyManager
         return new SshTestResult
         {
             Ok = false,
-            Message = string.IsNullOrWhiteSpace(output) ? "没有得到明确结果。" : output,
+            Message = string.IsNullOrWhiteSpace(output) ? Loc.T("Ssh.NoResult") : output,
             RawOutput = output
         };
     }

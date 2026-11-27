@@ -1,4 +1,5 @@
 using System.Windows;
+using VendorSync.Core;
 
 namespace VendorSync.UI;
 
@@ -9,22 +10,25 @@ namespace VendorSync.UI;
 public static class Prompt
 {
     /// <summary>信息提示。静默模式下直接跳过。</summary>
-    public static void Info(Window? owner, string text, string caption = "提示")
+    public static void Info(Window? owner, string text, string caption = "")
     {
+        caption = string.IsNullOrEmpty(caption) ? Loc.T("Caption.Info") : caption;
         if (AppLog.Silent) { AppLog.Write($"[提示] {caption}: {text}"); return; }
         MessageBox.Show(owner, text, caption, MessageBoxButton.OK, MessageBoxImage.Information);
     }
 
     /// <summary>警告提示。静默模式下写日志。</summary>
-    public static void Warn(Window? owner, string text, string caption = "注意")
+    public static void Warn(Window? owner, string text, string caption = "")
     {
+        caption = string.IsNullOrEmpty(caption) ? Loc.T("Caption.Warn") : caption;
         if (AppLog.Silent) { AppLog.Write($"[警告] {caption}: {text}"); return; }
         MessageBox.Show(owner, text, caption, MessageBoxButton.OK, MessageBoxImage.Warning);
     }
 
     /// <summary>错误提示。静默模式下写日志。</summary>
-    public static void Error(Window? owner, string text, string caption = "出错了")
+    public static void Error(Window? owner, string text, string caption = "")
     {
+        caption = string.IsNullOrEmpty(caption) ? Loc.T("Caption.Error") : caption;
         if (AppLog.Silent) { AppLog.Write($"[错误] {caption}: {text}"); return; }
         MessageBox.Show(owner, text, caption, MessageBoxButton.OK, MessageBoxImage.Error);
     }

@@ -25,7 +25,7 @@ public static class HeadlessInspect
 
         if (string.IsNullOrWhiteSpace(config.RepoPath))
         {
-            Emit("配置里没有仓库路径。请先在界面里选好仓库，或手工编辑 " + store.FilePath);
+            Emit(Loc.F("HI.NoRepo", store.FilePath));
             SaveReport(lines);
             return 2;
         }
@@ -33,14 +33,14 @@ public static class HeadlessInspect
         var git = GitClient.Locate();
         if (git is null)
         {
-            Emit("找不到 git.exe。");
+            Emit(Loc.T("HI.NoGit"));
             SaveReport(lines);
             return 2;
         }
 
         if (!git.IsRepository(config.RepoPath))
         {
-            Emit("不是 git 仓库：" + config.RepoPath);
+            Emit(Loc.F("HI.NotRepo", config.RepoPath));
             SaveReport(lines);
             return 2;
         }
@@ -55,28 +55,30 @@ public static class HeadlessInspect
         };
 
         var engine = new SyncEngine(git, message => Emit("  " + message));
-        Emit($"仓库：{config.RepoPath}");
-        Emit($"源仓库远程：{config.VendorRemote}    目标仓库远程：{config.InternalRemote}");
+        Emit(Loc.F("HI.Repo", config.RepoPath));
+        Emit(Loc.F("HI.Remotes", config.VendorRemote, config.InternalRemote));
         Emit(string.Empty);
 
         if (!engine.FetchAll(options, out var fetchError))
         {
-            Emit("拉取失败：" + fetchError);
+            Emit(Loc.F("HI.FetchFail", fetchError));
             SaveReport(lines);
             return 1;
         }
 
         var statuses = engine.Inspect(options);
         Emit(string.Empty);
-        Emit($"{"分支",-44}{"源",-10}{"目标",-10}{"状态",-8}{"差异"}");
+        Emit(string.Format("{0,-44}{1,-10}{2,-10}{3,-8}{4}",
+            Loc.T("HI.ColBranch"), Loc.T("HI.ColSource"), Loc.T("HI.ColTarget"),
+            Loc.T("HI.ColState"), Loc.T("HI.ColDelta")));
         foreach (var s in statuses)
         {
             var delta = s.State switch
             {
-                BranchState.Behind => $"源 +{s.VendorOnly}",
-                BranchState.InternalAhead => $"目标 +{s.InternalOnly}",
-                BranchState.Diverged => $"目标 +{s.InternalOnly} / 源 +{s.VendorOnly}",
-                BranchState.New => "全部新增",
+                BranchState.Behind => Loc.F("HI.Delta.Behind", s.VendorOnly),
+                BranchState.InternalAhead => Loc.F("HI.Delta.InternalAhead", s.InternalOnly),
+                BranchState.Diverged => Loc.F("HI.Delta.Diverged", s.InternalOnly, s.VendorOnly),
+                BranchState.New => Loc.T("HI.Delta.New"),
                 _ => "—"
             };
             var pad = 44 - s.Name.Length;
@@ -88,7 +90,7 @@ public static class HeadlessInspect
         if (internalOnly.Count > 0)
         {
             Emit(string.Empty);
-            Emit("目标仓库独有分支（不会删除）：" + string.Join(", ", internalOnly));
+            Emit(Loc.F("HI.InternalOnly", string.Join(", ", internalOnly)));
         }
 
         if (options.IncludeTags)
@@ -97,15 +99,15 @@ public static class HeadlessInspect
             if (vendorTotal > 0)
             {
                 Emit(string.Empty);
-                Emit($"标签：源仓库 {vendorTotal} 个，其中 {newCount} 个是目标仓库没有的新标签。");
+                Emit(Loc.F("HI.Tags", vendorTotal, newCount));
             }
         }
 
         var needPush = statuses.Count(s => s.NeedsPush);
         Emit(string.Empty);
         Emit(needPush == 0
-            ? "结论：全部分支已包含源仓库最新代码，无需同步。"
-            : $"结论：{needPush} 个分支需要上传（其中 {statuses.Count(s => s.State == BranchState.Diverged)} 个分叉）。");
+            ? Loc.T("HI.ConclusionOk")
+            : Loc.F("HI.ConclusionPending", needPush, statuses.Count(s => s.State == BranchState.Diverged)));
 
         SaveReport(lines);
         return 0;

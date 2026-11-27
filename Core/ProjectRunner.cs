@@ -83,10 +83,10 @@ public sealed class ProjectRunner
     public ProjectSnapshot? Inspect(SyncOptions options, out string error, IProgress<SyncProgress>? progress = null)
     {
         var engine = new SyncEngine(_git, _log);
-        progress?.Report(new SyncProgress(SyncStage.Connect, 0, 0, "正在连接两个仓库…"));
+        progress?.Report(new SyncProgress(SyncStage.Connect, 0, 0, Loc.T("Progress.Connect")));
         if (!engine.FetchAll(options, out error)) return null;
 
-        progress?.Report(new SyncProgress(SyncStage.Check, 0, 0, "正在比对分支差异…"));
+        progress?.Report(new SyncProgress(SyncStage.Check, 0, 0, Loc.T("Progress.Check")));
         IReadOnlyList<BranchStatus> statuses;
         IReadOnlyList<string> internalOnly;
         (int, int, List<string>) tags;
@@ -102,7 +102,7 @@ public sealed class ProjectRunner
             _log(error);
             return null;
         }
-        foreach (var b in internalOnly) _log($"目标仓库独有分支（不会删除）：{b}");
+        foreach (var b in internalOnly) _log(Loc.F("Log.InternalOnlyBranch", b));
 
         return new ProjectSnapshot
         {
@@ -130,15 +130,15 @@ public sealed class ProjectRunner
 
         if (snapshot.UpToDate)
         {
-            _log("全部内容已一致，无需同步。");
-            progress?.Report(new SyncProgress(SyncStage.Done, 0, 0, "已一致"));
+            _log(Loc.T("Log.AllUpToDate"));
+            progress?.Report(new SyncProgress(SyncStage.Done, 0, 0, Loc.T("Progress.UpToDate")));
             return new SyncRunResult { Snapshot = snapshot };
         }
 
         var risky = snapshot.Risky(options.Strategy);
         if (risky.Count > 0 && !confirmRisky(risky))
         {
-            _log("用户取消了同步。");
+            _log(Loc.T("Log.UserCancelled"));
             return new SyncRunResult { Snapshot = snapshot, Cancelled = true };
         }
 
@@ -147,34 +147,34 @@ public sealed class ProjectRunner
         var total = work.Count(snapshot.NeedsAction);
         var outcomes = new List<SyncOutcome>();
         var done = 0;
-        progress?.Report(new SyncProgress(SyncStage.Push, 0, total, "开始推送…"));
+        progress?.Report(new SyncProgress(SyncStage.Push, 0, total, Loc.T("Progress.PushStart")));
 
         foreach (var s in work)
         {
             if (ct.IsCancellationRequested)
             {
-                _log("已被用户取消。");
+                _log(Loc.T("Log.Cancelled"));
                 return new SyncRunResult { Snapshot = snapshot, Outcomes = outcomes, Cancelled = true };
             }
             var outcome = engine.Execute(options, s);
             outcomes.Add(outcome);
             if (outcome.Action is SyncActionKind.Skip or SyncActionKind.None) continue;
             done++;
-            progress?.Report(new SyncProgress(SyncStage.Push, done, Math.Max(total, done), $"推送 {s.Name}", outcome));
+            progress?.Report(new SyncProgress(SyncStage.Push, done, Math.Max(total, done), Loc.F("Progress.Pushing", s.Name), outcome));
         }
 
         int tagsPushed = 0, tagsFailed = 0;
         if (options.IncludeTags && snapshot.NewTagCount > 0 && !ct.IsCancellationRequested)
         {
-            progress?.Report(new SyncProgress(SyncStage.Push, done, Math.Max(total, done), $"推送 {snapshot.NewTagCount} 个新标签"));
+            progress?.Report(new SyncProgress(SyncStage.Push, done, Math.Max(total, done), Loc.F("Progress.PushTags", snapshot.NewTagCount)));
             (tagsPushed, tagsFailed) = engine.SyncTags(options);
-            _log(tagsFailed == 0 ? $"  [标签] 完成：新增 {tagsPushed} 个标签。" : $"  [标签] 新增 {tagsPushed} 个，{tagsFailed} 个失败。");
+            _log(tagsFailed == 0 ? Loc.F("Log.TagsDone", tagsPushed) : Loc.F("Log.TagsPartial", tagsPushed, tagsFailed));
         }
 
-        progress?.Report(new SyncProgress(SyncStage.Verify, 0, 0, "正在核对服务器上的真实状态…"));
+        progress?.Report(new SyncProgress(SyncStage.Verify, 0, 0, Loc.T("Progress.Verify")));
         var verify = engine.Verify(options, snapshot.Statuses);
-        foreach (var v in verify.Where(v => !v.Covered)) _log($"  ✖ 校验未通过：{v.Branch}");
-        progress?.Report(new SyncProgress(SyncStage.Done, done, total, "完成"));
+        foreach (var v in verify.Where(v => !v.Covered)) _log(Loc.F("Log.VerifyFail", v.Branch));
+        progress?.Report(new SyncProgress(SyncStage.Done, done, total, Loc.T("Progress.Done")));
 
         return new SyncRunResult
         {

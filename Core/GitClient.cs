@@ -320,21 +320,21 @@ public static class GitProblem
         if (r.TimedOut)
         {
             return (GitProblemKind.Network,
-                $"连接 {remote} 超时。",
-                "多半是网络没通。连上后重试；仍超时请联系服务器管理员确认端口。");
+                Loc.F("Problem.Timeout", remote),
+                Loc.T("Hint.Timeout"));
         }
 
         if (text.Contains("permission denied (publickey"))
         {
             return (GitProblemKind.SshKey,
-                "服务器不认识你这台机器的 SSH 密钥。",
-                "点「凭据与密钥…」→「SSH 密钥」生成密钥并把公钥登记到 Git 服务器，然后点「测试连接」验证。");
+                Loc.T("Problem.SshKey"),
+                Loc.T("Hint.SshKey"));
         }
         if (text.Contains("host key verification failed") || text.Contains("remote host identification has changed"))
         {
             return (GitProblemKind.HostKey,
-                "服务器指纹校验没通过。",
-                "如果是第一次连接，请先确认指纹无误；如果以前能连现在变了，请联系 IT —— 这可能是中间人攻击。");
+                Loc.T("Problem.HostKey"),
+                Loc.T("Hint.HostKey"));
         }
         if (text.Contains("could not read username") || text.Contains("could not read password") ||
             text.Contains("unable to get password") || text.Contains("unable to get username") ||
@@ -342,44 +342,45 @@ public static class GitProblem
             text.Contains("terminal prompts disabled"))
         {
             return (GitProblemKind.HttpsCredential,
-                "HTTPS 地址需要账号或令牌，但当前拿不到。",
-                "请把该站点的账号 / 个人访问令牌（PAT）保存进你本机的 Git 凭据管理器（Windows 凭据管理器），保存后重试即可。");
+                Loc.T("Problem.HttpsCred"),
+                Loc.T("Hint.HttpsCred"));
         }
         if (text.Contains("could not resolve host") || text.Contains("name or service not known") ||
             text.Contains("no such host"))
         {
             return (GitProblemKind.Dns,
-                "域名解析不出来。",
-                "通常是没连公司网络或 VPN。连上后重试。");
+                Loc.T("Problem.Dns"),
+                Loc.T("Hint.Dns"));
         }
         if (text.Contains("connection refused") || text.Contains("connection timed out") ||
             text.Contains("network is unreachable") || text.Contains("connection reset") ||
             text.Contains("failed to connect"))
         {
             return (GitProblemKind.Network,
-                $"连不上服务器 {remote}。",
-                "检查网络、VPN、端口和防火墙。");
+                Loc.F("Problem.Network", remote),
+                Loc.T("Hint.Network"));
         }
         if (text.Contains("repository not found") || text.Contains("does not appear to be a git repository") ||
             text.Contains("no such repository") || text.Contains("repository '") )
         {
             return (GitProblemKind.RepoMissing,
-                "仓库不存在或当前账号没有权限。",
-                "先核对地址拼写，再确认该账号在这个仓库上有读/写权限。");
+                Loc.T("Problem.RepoMissing"),
+                Loc.T("Hint.RepoMissing"));
         }
         if (text.Contains("dubious ownership") || text.Contains("safe.directory"))
         {
             return (GitProblemKind.Ownership,
-                "这个目录属于别的 Windows 用户，git 拒绝操作。",
-                "在确认目录可信后执行：git config --global --add safe.directory <该目录路径>；或把目录权限改回当前用户。");
+                Loc.T("Problem.Ownership"),
+                Loc.T("Hint.Ownership"));
         }
         if (text.Contains("not a git repository"))
         {
             return (GitProblemKind.NotARepository,
-                "这个目录不是 git 仓库。",
-                "确认路径指向仓库根目录，或者先克隆一次。");
+                Loc.T("Problem.NotARepo"),
+                Loc.T("Hint.NotARepo"));
         }
 
-        return (GitProblemKind.Unknown, "操作失败。", string.IsNullOrWhiteSpace(r.Combined) ? "没有更多信息。" : r.Combined.Trim());
+        return (GitProblemKind.Unknown, Loc.T("Problem.Unknown"),
+            string.IsNullOrWhiteSpace(r.Combined) ? Loc.T("Hint.None") : r.Combined.Trim());
     }
 }

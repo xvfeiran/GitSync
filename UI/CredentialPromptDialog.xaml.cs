@@ -21,9 +21,8 @@ public partial class CredentialPromptDialog : Window
         _url = url;
         _manager = new HttpsCredentialManager(git, log);
 
-        HeaderText.Text = $"远程「{remoteName}」需要登录凭据才能继续";
+        HeaderText.Text = Loc.F("CredPrompt.Header", remoteName);
         var target = RemoteUrl.GetHttpsTarget(url);
-        HeaderText.Text = $"远程「{remoteName}」需要登录凭据才能继续";
         HostText.Text = target?.Host ?? url;
         UserBox.Text = target?.Username ?? Environment.UserName;
     }
@@ -54,7 +53,7 @@ public partial class CredentialPromptDialog : Window
         var status = _manager.Save(_url, UserBox.Text.Trim(), Password);
         if (!status.Ok)
         {
-            Prompt.Warn(this, status.Summary + "\r\n\r\n" + status.Detail, "保存失败");
+            Prompt.Warn(this, Loc.F("CredPrompt.SaveFail", status.Summary, status.Detail), Loc.T("Caption.SaveFail"));
             return;
         }
         DialogResult = true;

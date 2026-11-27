@@ -9,7 +9,7 @@ public sealed class HelperEntry
     public string Origin { get; init; } = string.Empty;
     public string? ResolvedPath { get; init; }
     public bool Exists { get; init; }
-    public string Explain => Exists ? "可用" : "文件不存在";
+    public string Explain => Loc.T(Exists ? "Helper.Available" : "Helper.Missing");
 }
 
 /// <summary>凭据环境的诊断结果。</summary>
@@ -168,11 +168,11 @@ public static class CredentialHelperResolver
             return new HelperDiagnosis
             {
                 NeedsRepair = true,
-                Summary = "没有配置凭据辅助程序",
-                Detail = "这台机器的 git 没有设置 credential.helper，HTTPS 凭据无法保存。" +
+                Summary = Loc.T("Diag.NoHelperSummary"),
+                Detail = Loc.T("Diag.NoHelperDetailHead") +
                          (available.Count > 0
-                             ? "点下面的按钮可以把找到的 Git Credential Manager 配上。"
-                             : "也没找到可用的 Git Credential Manager，请重装 Git for Windows。"),
+                             ? Loc.T("Diag.NoHelperDetailHasHelper")
+                             : Loc.T("Diag.NoHelperDetailNoHelper")),
                 ReplacementPath = available.FirstOrDefault(),
                 Configured = configured,
                 Available = available
@@ -185,7 +185,7 @@ public static class CredentialHelperResolver
             return new HelperDiagnosis
             {
                 NeedsRepair = false,
-                Summary = "凭据辅助程序配置正常",
+                Summary = Loc.T("Diag.OkSummary"),
                 Detail = string.Join("\n", configured.Select(c => $"  {c.Value}  ← {c.Origin}")),
                 Configured = configured,
                 Available = available
@@ -196,18 +196,18 @@ public static class CredentialHelperResolver
         var sb = new StringBuilder();
         foreach (var b in broken)
         {
-            sb.Append($"  已配置：{b.Value}（来自 {b.Origin}）\n");
-            sb.Append($"  但文件不存在：{b.ResolvedPath ?? b.Value}\n");
+            sb.AppendLine(Loc.F("Diag.BrokenLine1", b.Value, b.Origin));
+            sb.AppendLine(Loc.F("Diag.BrokenLine2", b.ResolvedPath ?? b.Value));
         }
         if (replacement is not null)
         {
-            sb.Append($"  可用的替代：{replacement}\n");
+            sb.AppendLine(Loc.F("Diag.ReplacementLine", replacement));
         }
 
         return new HelperDiagnosis
         {
             NeedsRepair = true,
-            Summary = "凭据辅助程序路径指向了不存在的文件",
+            Summary = Loc.T("Diag.BrokenSummary"),
             Detail = sb.ToString(),
 
             // 找不到替代时也必须标记需要修正，否则无法保存 HTTPS 凭据。
@@ -248,7 +248,7 @@ public static class CredentialHelperResolver
     {
         if (!File.Exists(helperPath))
         {
-            return (false, "目标文件不存在：" + helperPath);
+            return (false, Loc.F("Err.PersistFileMissing", helperPath));
         }
 
         var escaped = EscapeForGitConfig(helperPath.Replace('\\', '/'));
@@ -257,18 +257,18 @@ public static class CredentialHelperResolver
         var reset = git.Run(new[] { "config", "--global", "--replace-all", "credential.helper", string.Empty });
         if (reset.ExitCode != 0)
         {
-            return (false, "写入失败：" + reset.Combined);
+            return (false, Loc.F("Err.PersistFail", reset.Combined));
         }
 
         var add = git.Run(new[] { "config", "--global", "--add", "credential.helper", escaped });
         if (add.ExitCode != 0)
         {
-            return (false, "写入失败：" + add.Combined);
+            return (false, Loc.F("Err.PersistFail", add.Combined));
         }
 
         var verify = Diagnose(git);
         return verify.NeedsRepair
-            ? (false, "写入后仍然检测到问题：" + verify.Summary)
-            : (true, "已写入用户级 git 配置。");
+            ? (false, Loc.F("Err.PersistStillBroken", verify.Summary))
+            : (true, Loc.T("Msg.PersistOk"));
     }
 }
